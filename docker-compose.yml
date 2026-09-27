@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: support-postgres
+    environment:
+      POSTGRES_DB: support_platform
+      POSTGRES_USER: support_user
+      POSTGRES_PASSWORD: support_password
+      TZ: Asia/Kolkata
+      PGTZ: Asia/Kolkata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: customer-support-platform
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/support_platform
+    username: support_user
+    password: support_password
+    hikari:
+      connection-init-sql: SET TIME ZONE 'Asia/Kolkata'
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
