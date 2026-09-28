@@ -3,12 +3,14 @@ package com.aneesh.support.customer;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.time.LocalDateTime;
 
 @Getter
 @Entity
 @Table(name = "customers")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Customer {
 
     @Id
