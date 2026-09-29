@@ -2,6 +2,7 @@ package com.aneesh.support.ticket;
 
 import com.aneesh.support.customer.Customer;
 import com.aneesh.support.customer.CustomerRepository;
+import com.aneesh.support.kafka.TicketEventProducer;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
@@ -16,12 +17,15 @@ public class TicketController {
 
     private final TicketRepository ticketRepository;
     private final CustomerRepository customerRepository;
+    private final TicketEventProducer ticketEventProducer;
 
     public TicketController(
             TicketRepository ticketRepository,
-            CustomerRepository customerRepository) {
+            CustomerRepository customerRepository,
+            TicketEventProducer ticketEventProducer) {
         this.ticketRepository = ticketRepository;
         this.customerRepository = customerRepository;
+        this.ticketEventProducer = ticketEventProducer;
     }
 
     @PostMapping
@@ -39,7 +43,17 @@ public class TicketController {
                 request.description()
         );
 
-        return ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
+
+        TicketCreatedEvent event = new TicketCreatedEvent(
+                "TICKET_CREATED",
+                savedTicket.getId(),
+                savedTicket.getCustomer().getId()
+        );
+
+        ticketEventProducer.publishTicketCreated(event);
+
+        return savedTicket;
     }
 
     @GetMapping
@@ -50,7 +64,9 @@ public class TicketController {
     @GetMapping("/{id}")
     public Ticket getTicket(@PathVariable Long id) {
         return ticketRepository.findById(id)
-                .orElseThrow();
+                .orElseThrow(() -> new RuntimeException(
+                        "Ticket not found: " + id
+                ));
     }
 
     @PatchMapping("/{id}")
