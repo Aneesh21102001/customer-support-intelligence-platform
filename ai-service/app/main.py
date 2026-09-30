@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
+from app.rag import build_rag_context
 
 load_dotenv()
 
@@ -37,8 +38,19 @@ def health():
 @app.post("/analyze-ticket", response_model=TicketAnalysis)
 def analyze_ticket(ticket: TicketRequest):
 
+    context = build_rag_context(
+        f"{ticket.subject}\n{ticket.description}"
+    )
+
     prompt = f"""
-Analyze this customer support ticket.
+You are a customer support AI assistant.
+
+Use the knowledge base below to help analyze the customer ticket.
+
+KNOWLEDGE BASE:
+{context}
+
+CUSTOMER TICKET:
 
 Subject:
 {ticket.subject}
