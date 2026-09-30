@@ -1,5 +1,6 @@
 package com.aneesh.support.ticket;
 
+import com.aneesh.support.ai.AiServiceClient;
 import com.aneesh.support.customer.Customer;
 import com.aneesh.support.customer.CustomerRepository;
 import com.aneesh.support.kafka.TicketEventProducer;
@@ -18,14 +19,17 @@ public class TicketController {
     private final TicketRepository ticketRepository;
     private final CustomerRepository customerRepository;
     private final TicketEventProducer ticketEventProducer;
+    private final AiServiceClient aiServiceClient;
 
     public TicketController(
             TicketRepository ticketRepository,
             CustomerRepository customerRepository,
-            TicketEventProducer ticketEventProducer) {
+            TicketEventProducer ticketEventProducer,
+            AiServiceClient aiServiceClient) {
         this.ticketRepository = ticketRepository;
         this.customerRepository = customerRepository;
         this.ticketEventProducer = ticketEventProducer;
+        this.aiServiceClient = aiServiceClient;
     }
 
     @PostMapping
@@ -67,6 +71,14 @@ public class TicketController {
                 .orElseThrow(() -> new RuntimeException(
                         "Ticket not found: " + id
                 ));
+    }
+
+    @GetMapping("/ai-test")
+    public String testAi() {
+        return aiServiceClient.analyzeTicket(
+                "Payment failed",
+                "Customer payment is failing during checkout"
+        );
     }
 
     @PatchMapping("/{id}")

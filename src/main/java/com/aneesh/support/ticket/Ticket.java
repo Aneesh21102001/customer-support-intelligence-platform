@@ -39,6 +39,14 @@ public class Ticket {
     @Column(nullable = false)
     private TicketPriority priority;
 
+    @Setter
+    @Column
+    private String category;
+
+    @Setter
+    @Column
+    private String sentiment;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
