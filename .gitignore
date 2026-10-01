@@ -3,6 +3,9 @@
 .vscode/
 *.log
 .env
+.env.local
 .venv/
 __pycache__/
 chroma_db/
+node_modules/
+.next/
