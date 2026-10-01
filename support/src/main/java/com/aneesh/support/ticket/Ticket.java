@@ -47,6 +47,14 @@ public class Ticket {
     @Column
     private String sentiment;
 
+    @Setter
+    @Column(columnDefinition = "TEXT")
+    private String suggestedResponse;
+
+    @Setter
+    @Column(columnDefinition = "TEXT")
+    private String knowledgeSources;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 

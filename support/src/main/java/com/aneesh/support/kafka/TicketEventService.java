@@ -53,6 +53,20 @@ public class TicketEventService {
             );
             ticket.setSentiment(result.get("sentiment").asText());
 
+            ticket.setSuggestedResponse(
+                    result.get("suggested_response").asText()
+            );
+
+            ticket.setKnowledgeSources(
+                    String.join(
+                            ", ",
+                            objectMapper.convertValue(
+                                    result.get("sources"),
+                                    java.util.List.class
+                            )
+                    )
+            );
+
             ticketRepository.save(ticket);
 
             System.out.println(

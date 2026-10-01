@@ -77,3 +77,16 @@ def build_rag_context(query: str, n_results: int = 2):
         )
 
     return "\n\n".join(context_parts)
+
+def get_knowledge_sources(query: str, n_results: int = 2):
+    results = search_knowledge(query, n_results)
+
+    sources = []
+
+    for metadata in results["metadatas"][0]:
+        source = metadata["source"]
+
+        if source not in sources:
+            sources.append(source)
+
+    return sources
