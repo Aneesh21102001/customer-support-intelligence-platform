@@ -6,6 +6,7 @@ import com.aneesh.support.customer.CustomerRepository;
 import com.aneesh.support.kafka.TicketEventProducer;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -13,6 +14,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 @RestController
+@CrossOrigin(origins = "http://localhost:3000")
 @RequestMapping("/api/tickets")
 public class TicketController {
 
