@@ -12,7 +12,7 @@ type Ticket = {
     sentiment: string | null;
     suggestedResponse: string | null;
     knowledgeSources: string | null;
-    aiProcessing?: boolean;
+    aiStatus?: "PROCESSING" | "COMPLETED" | "FAILED";
 };
 
 export default function Home() {
@@ -86,7 +86,7 @@ export default function Home() {
             setDescription("");
 
             // Show the newly created ticket immediately
-            newTicket.aiProcessing = true;
+            newTicket.aiStatus = "PROCESSING";
             setSelectedTicket(newTicket);
 
             // Give Kafka + AI time to process the ticket
@@ -102,10 +102,10 @@ export default function Home() {
 
                     const updatedTicket = await updatedResponse.json();
 
-                    updatedTicket.aiProcessing = !(
-                        updatedTicket.category &&
-                        updatedTicket.suggestedResponse
-                    );
+                    updatedTicket.aiStatus =
+                        updatedTicket.category && updatedTicket.suggestedResponse
+                            ? "COMPLETED"
+                            : "PROCESSING";
 
                     setTickets((currentTickets) =>
                         currentTickets.map((ticket) =>
@@ -130,6 +130,18 @@ export default function Home() {
                         setTimeout(() => {
                             pollForAiResult(attempt + 1);
                         }, 1000);
+                    } else {
+                        updatedTicket.aiStatus = "FAILED";
+
+                        setTickets((currentTickets) =>
+                            currentTickets.map((ticket) =>
+                                ticket.id === updatedTicket.id
+                                    ? updatedTicket
+                                    : ticket
+                            )
+                        );
+
+                        setSelectedTicket(updatedTicket);
                     }
                 } catch (error) {
                     console.error(
@@ -482,10 +494,18 @@ export default function Home() {
                                 </div>
                             </div>
 
-                            {selectedTicket.aiProcessing && (
+                            {selectedTicket.aiStatus === "PROCESSING" && (
                                 <div className="mt-5 rounded-lg bg-yellow-50 p-4">
                                     <p className="text-sm font-medium text-yellow-800">
                                         AI analysis is still processing...
+                                    </p>
+                                </div>
+                            )}
+
+                            {selectedTicket.aiStatus === "FAILED" && (
+                                <div className="mt-5 rounded-lg bg-red-50 p-4">
+                                    <p className="text-sm font-medium text-red-800">
+                                        AI analysis failed. Please try again later.
                                     </p>
                                 </div>
                             )}
