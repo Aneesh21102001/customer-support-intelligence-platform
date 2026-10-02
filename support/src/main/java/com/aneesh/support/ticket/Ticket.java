@@ -55,6 +55,11 @@ public class Ticket {
     @Column(columnDefinition = "TEXT")
     private String knowledgeSources;
 
+    @Setter
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AiProcessingStatus aiStatus;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -69,6 +74,8 @@ public class Ticket {
         if (priority == null) {
             priority = TicketPriority.MEDIUM;
         }
+
+        if (aiStatus == null) aiStatus = AiProcessingStatus.PROCESSING;
     }
 
     public Ticket() {
