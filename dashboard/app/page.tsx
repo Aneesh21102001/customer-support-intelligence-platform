@@ -6,6 +6,11 @@ type Ticket = {
     id: number;
     subject: string;
     description: string;
+    customer?: {
+        id: number;
+        name: string;
+        email: string;
+    };
     status: string;
     priority: string;
     category: string | null;
@@ -20,11 +25,20 @@ export default function Home() {
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [loading, setLoading] = useState(true);
     const [customerId, setCustomerId] = useState("1");
+    const [customers, setCustomers] = useState<
+        { id: number; name: string; email: string }[]
+    >([]);
+    const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
+    const [newCustomerName, setNewCustomerName] = useState("");
+    const [newCustomerEmail, setNewCustomerEmail] = useState("");
+    const [creatingCustomer, setCreatingCustomer] = useState(false);
+    const [customerMessage, setCustomerMessage] = useState("");
     const [subject, setSubject] = useState("");
     const [description, setDescription] = useState("");
     const [creating, setCreating] = useState(false);
     const [createMessage, setCreateMessage] = useState("");
     const [updating, setUpdating] = useState(false);
+    const [retryingAi, setRetryingAi] = useState(false);
     const [updateStatus, setUpdateStatus] = useState("");
     const [updatePriority, setUpdatePriority] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
@@ -48,7 +62,63 @@ export default function Home() {
                 console.error("Failed to fetch tickets:", error);
                 setLoading(false);
             });
+        fetch("http://localhost:8080/api/customers")
+            .then((response) => response.json())
+            .then((data) => {
+                setCustomers(data);
+            })
+            .catch((error) => {
+                console.error("Failed to fetch customers:", error);
+            });
     }, []);
+
+    const createCustomer = async () => {
+        if (!newCustomerName.trim() || !newCustomerEmail.trim()) {
+            setCustomerMessage("Name and email are required.");
+            return;
+        }
+
+        setCustomerMessage("");
+
+        setCreatingCustomer(true);
+
+        try {
+            const response = await fetch(
+                "http://localhost:8080/api/customers",
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        name: newCustomerName,
+                        email: newCustomerEmail,
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("Failed to create customer");
+            }
+
+            const newCustomer = await response.json();
+
+            setCustomers((currentCustomers) => [
+                ...currentCustomers,
+                newCustomer,
+            ]);
+
+            setCustomerId(String(newCustomer.id));
+            setNewCustomerName("");
+            setNewCustomerEmail("");
+            setCustomerMessage("Customer created successfully.");
+        } catch (error) {
+            console.error("Failed to create customer:", error);
+            setCustomerMessage("Customer with this email already exists.");
+        } finally {
+            setCreatingCustomer(false);
+        }
+    };
 
     const createTicket = async () => {
         if (!subject.trim() || !description.trim()) {
@@ -210,9 +280,50 @@ export default function Home() {
         }
     };
 
+    const retryAiAnalysis = async () => {
+        if (!selectedTicket) {
+            return;
+        }
+
+        setRetryingAi(true);
+
+        try {
+            const response = await fetch(
+                `http://localhost:8080/api/tickets/${selectedTicket.id}/retry-ai`,
+                {
+                    method: "POST",
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("Failed to retry AI analysis");
+            }
+
+            const ticket = await response.json();
+
+            ticket.aiStatus = "PROCESSING";
+
+            setTickets((currentTickets) =>
+                currentTickets.map((currentTicket) =>
+                    currentTicket.id === ticket.id
+                        ? ticket
+                        : currentTicket
+                )
+            );
+
+            setSelectedTicket(ticket);
+        } catch (error) {
+            console.error("Failed to retry AI analysis:", error);
+        } finally {
+            setRetryingAi(false);
+        }
+    };
+
     const filteredTickets = tickets.filter((ticket) =>
         (statusFilter === "ALL" || ticket.status === statusFilter) &&
         (priorityFilter === "ALL" || ticket.priority === priorityFilter) &&
+        (selectedCustomer === null ||
+            ticket.customer?.id === selectedCustomer) &&
         (
             ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
             ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -265,10 +376,100 @@ export default function Home() {
                         flexShrink: 0,
                     }}
                 >
+                    <div className="mb-4 rounded-lg bg-white p-4 shadow">
+                        <h3 className="font-semibold text-gray-900">
+                            Customers
+                        </h3>
+
+                        {selectedCustomer !== null && (
+                            <button
+                                onClick={() => setSelectedCustomer(null)}
+                                className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                            >
+                                Clear customer filter
+                            </button>
+                        )}
+
+                        <div className="mt-3 space-y-2">
+                            {customers.map((customer) => (
+                                <div
+                                    key={customer.id}
+                                    onClick={() => setSelectedCustomer(customer.id)}
+                                    className={`cursor-pointer rounded-md border p-3 ${
+                                        selectedCustomer === customer.id
+                                            ? "border-blue-500 bg-blue-50"
+                                            : "border-gray-200 hover:bg-gray-50"
+                                    }`}
+                                >
+                                    <p className="text-sm font-medium text-gray-900">
+                                        {customer.name}
+                                    </p>
+
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {tickets.filter(
+                                            (ticket) => ticket.customer?.id === customer.id
+                                        ).length}{" "}
+                                        {tickets.filter(
+                                            (ticket) => ticket.customer?.id === customer.id
+                                        ).length === 1
+                                            ? "ticket"
+                                            : "tickets"}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="mb-4 rounded-lg bg-white p-4 shadow">
+                        <h3 className="font-semibold text-gray-900">
+                            Create Customer
+                        </h3>
+
+                        <input
+                            type="text"
+                            placeholder="Customer name"
+                            value={newCustomerName}
+                            onChange={(e) => setNewCustomerName(e.target.value)}
+                            className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                        />
+
+                        <input
+                            type="email"
+                            placeholder="Customer email"
+                            value={newCustomerEmail}
+                            onChange={(e) => setNewCustomerEmail(e.target.value)}
+                            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                        />
+
+                        <button
+                            onClick={createCustomer}
+                            disabled={creatingCustomer}
+                            className="mt-3 w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            {creatingCustomer ? "Creating..." : "Create Customer"}
+                        </button>
+
+                        {customerMessage && (
+                            <p className="mt-2 text-sm text-gray-600">
+                                {customerMessage}
+                            </p>
+                        )}
+                    </div>
                     <div className="mt-4 rounded-lg bg-white p-4 shadow">
                         <h3 className="font-semibold text-gray-900">
                             Create Ticket
                         </h3>
+
+                        <select
+                            value={customerId}
+                            onChange={(e) => setCustomerId(e.target.value)}
+                            className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                        >
+                            {customers.map((customer) => (
+                                <option key={customer.id} value={customer.id}>
+                                    {customer.name} ({customer.email})
+                                </option>
+                            ))}
+                        </select>
 
                         <input
                             type="text"
@@ -350,6 +551,12 @@ export default function Home() {
                                     #{ticket.id} {ticket.subject}
                                 </h3>
 
+                                {ticket.customer && (
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        {ticket.customer.name}
+                                    </p>
+                                )}
+
                                 <div className="mt-2 flex flex-wrap gap-2 text-xs">
                                     <span className="rounded-full bg-gray-100 px-2 py-1 font-medium text-gray-700">
                                         {ticket.status}
@@ -417,6 +624,22 @@ export default function Home() {
                             <p className="mt-4 text-gray-900">
                                 {selectedTicket.description}
                             </p>
+
+                            {selectedTicket.customer && (
+                                <div className="mt-4 rounded-lg bg-gray-50 p-4">
+                                    <h3 className="font-semibold text-gray-900">
+                                        Customer
+                                    </h3>
+
+                                    <p className="mt-1 text-sm text-gray-700">
+                                        {selectedTicket.customer.name}
+                                    </p>
+
+                                    <p className="text-sm text-gray-500">
+                                        {selectedTicket.customer.email}
+                                    </p>
+                                </div>
+                            )}
 
                             <div className="mt-6 flex flex-wrap gap-2 text-sm">
                               <span
@@ -507,6 +730,14 @@ export default function Home() {
                                     <p className="text-sm font-medium text-red-800">
                                         AI analysis failed. Please try again later.
                                     </p>
+
+                                    <button
+                                        onClick={retryAiAnalysis}
+                                        disabled={retryingAi}
+                                        className="mt-3 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                        {retryingAi ? "Retrying..." : "Retry AI Analysis"}
+                                    </button>
                                 </div>
                             )}
 

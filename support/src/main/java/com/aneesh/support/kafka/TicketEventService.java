@@ -33,6 +33,12 @@ public class TicketEventService {
                         )
                 );
 
+        ticket.setAiStatus(
+                com.aneesh.support.ticket.AiProcessingStatus.PROCESSING
+        );
+
+        ticketRepository.save(ticket);
+
         String analysis = aiServiceClient.analyzeTicket(
                 ticket.getSubject(),
                 ticket.getDescription()
@@ -67,6 +73,10 @@ public class TicketEventService {
                     )
             );
 
+            ticket.setAiStatus(
+                    com.aneesh.support.ticket.AiProcessingStatus.COMPLETED
+            );
+
             ticketRepository.save(ticket);
 
             System.out.println(
@@ -74,6 +84,13 @@ public class TicketEventService {
             );
 
         } catch (Exception e) {
+
+            ticket.setAiStatus(
+                    com.aneesh.support.ticket.AiProcessingStatus.FAILED
+            );
+
+            ticketRepository.save(ticket);
+
             throw new RuntimeException(
                     "Failed to process AI analysis for ticket " + ticket.getId(),
                     e

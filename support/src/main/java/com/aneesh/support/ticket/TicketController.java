@@ -112,6 +112,25 @@ public class TicketController {
         return ticketRepository.save(ticket);
     }
 
+    @PostMapping("/{id}/retry-ai")
+    public Ticket retryAiAnalysis(@PathVariable Long id) {
+
+        Ticket ticket = ticketRepository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Ticket not found: " + id)
+                );
+
+        ticketEventProducer.publishTicketCreated(
+                new TicketCreatedEvent(
+                        "TICKET_CREATED",
+                        ticket.getId(),
+                        ticket.getCustomer().getId()
+                )
+        );
+
+        return ticket;
+    }
+
     public record CreateTicketRequest(
 
             @NotNull(message = "customerId is required")
