@@ -1,6 +1,7 @@
 package com.aneesh.support.kafka;
 
 import com.aneesh.support.ai.AiServiceClient;
+import com.aneesh.support.exception.ResourceNotFoundException;
 import com.aneesh.support.ticket.Ticket;
 import com.aneesh.support.ticket.TicketCreatedEvent;
 import com.aneesh.support.ticket.TicketRepository;
@@ -28,7 +29,7 @@ public class TicketEventService {
 
         Ticket ticket = ticketRepository.findById(event.ticketId())
                 .orElseThrow(() ->
-                        new RuntimeException(
+                        new ResourceNotFoundException(
                                 "Ticket not found: " + event.ticketId()
                         )
                 );
@@ -39,14 +40,13 @@ public class TicketEventService {
 
         ticketRepository.save(ticket);
 
-        String analysis = aiServiceClient.analyzeTicket(
-                ticket.getSubject(),
-                ticket.getDescription()
-        );
-
-        String json = analysis;
-
         try {
+            String analysis = aiServiceClient.analyzeTicket(
+                    ticket.getSubject(),
+                    ticket.getDescription()
+            );
+
+            String json = analysis;
             var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
 
             var result = objectMapper.readTree(json);

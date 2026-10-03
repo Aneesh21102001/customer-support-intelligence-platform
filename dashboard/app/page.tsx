@@ -80,26 +80,23 @@ export default function Home() {
         }
 
         setCustomerMessage("");
-
         setCreatingCustomer(true);
 
         try {
-            const response = await fetch(
-                "http://localhost:8080/api/customers",
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        name: newCustomerName,
-                        email: newCustomerEmail,
-                    }),
-                }
-            );
+            const response = await fetch("http://localhost:8080/api/customers", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    name: newCustomerName,
+                    email: newCustomerEmail,
+                }),
+            });
 
             if (!response.ok) {
-                throw new Error("Failed to create customer");
+                const errorData = await response.json();
+                throw new Error(errorData.message || "Failed to create customer");
             }
 
             const newCustomer = await response.json();
@@ -115,7 +112,12 @@ export default function Home() {
             setCustomerMessage("Customer created successfully.");
         } catch (error) {
             console.error("Failed to create customer:", error);
-            setCustomerMessage("Customer with this email already exists.");
+
+            setCustomerMessage(
+                error instanceof Error
+                    ? error.message
+                    : "Failed to create customer."
+            );
         } finally {
             setCreatingCustomer(false);
         }

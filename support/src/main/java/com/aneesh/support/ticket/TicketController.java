@@ -3,6 +3,7 @@ package com.aneesh.support.ticket;
 import com.aneesh.support.ai.AiServiceClient;
 import com.aneesh.support.customer.Customer;
 import com.aneesh.support.customer.CustomerRepository;
+import com.aneesh.support.exception.ResourceNotFoundException;
 import com.aneesh.support.kafka.TicketEventProducer;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -39,7 +40,7 @@ public class TicketController {
     public Ticket createTicket(@Valid @RequestBody CreateTicketRequest request) {
 
         Customer customer = customerRepository.findById(request.customerId())
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "Customer not found: " + request.customerId()
                 ));
 
@@ -70,7 +71,7 @@ public class TicketController {
     @GetMapping("/{id}")
     public Ticket getTicket(@PathVariable Long id) {
         return ticketRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "Ticket not found: " + id
                 ));
     }
@@ -89,7 +90,7 @@ public class TicketController {
             @RequestBody UpdateTicketRequest request) {
 
         Ticket ticket = ticketRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException(
+                .orElseThrow(() -> new ResourceNotFoundException(
                         "Ticket not found: " + id
                 ));
 
@@ -117,7 +118,7 @@ public class TicketController {
 
         Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Ticket not found: " + id)
+                        new ResourceNotFoundException("Ticket not found: " + id)
                 );
 
         ticketEventProducer.publishTicketCreated(
