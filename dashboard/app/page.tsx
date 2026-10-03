@@ -44,6 +44,7 @@ export default function Home() {
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [priorityFilter, setPriorityFilter] = useState("ALL");
+    const [aiStatusFilter, setAiStatusFilter] = useState("ALL");
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
@@ -322,13 +323,33 @@ export default function Home() {
     const filteredTickets = tickets.filter((ticket) =>
         (statusFilter === "ALL" || ticket.status === statusFilter) &&
         (priorityFilter === "ALL" || ticket.priority === priorityFilter) &&
-        (selectedCustomer === null ||
-            ticket.customer?.id === selectedCustomer) &&
+        (selectedCustomer === null || ticket.customer?.id === selectedCustomer) &&
+        (aiStatusFilter === "ALL" || ticket.aiStatus === aiStatusFilter) &&
         (
             ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
             ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
         )
     );
+
+    const totalTickets = tickets.length;
+
+    const totalCustomers = customers.length;
+
+    const openTickets = tickets.filter(
+        (ticket) => ticket.status === "OPEN"
+    ).length;
+
+    const aiCompleted = tickets.filter(
+        (ticket) => ticket.aiStatus === "COMPLETED"
+    ).length;
+
+    const aiProcessing = tickets.filter(
+        (ticket) => ticket.aiStatus === "PROCESSING"
+    ).length;
+
+    const aiFailed = tickets.filter(
+        (ticket) => ticket.aiStatus === "FAILED"
+    ).length;
 
     const ticketsPerPage = 10;
 
@@ -360,6 +381,90 @@ export default function Home() {
             <p className="mt-2 text-gray-600">
                 Manage customer tickets and AI-powered support insights.
             </p>
+
+            <div
+                className="mt-6"
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "16px",
+                }}
+            >
+                <div className="min-h-24 rounded-lg bg-white p-5 shadow">
+                    <p className="text-sm text-gray-500">
+                        Total Tickets
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {totalTickets}
+                    </p>
+                </div>
+
+                <div className="min-h-24 rounded-lg bg-white p-5 shadow">
+                    <p className="text-sm text-gray-500">
+                        Customers
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {totalCustomers}
+                    </p>
+                </div>
+
+                <div className="min-h-24 rounded-lg bg-white p-5 shadow">
+                    <p className="text-sm text-gray-500">
+                        Open Tickets
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {openTickets}
+                    </p>
+                </div>
+            </div>
+
+            <div
+                className="mt-4"
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "16px",
+                }}
+            >
+                <div className="min-h-24 rounded-lg bg-white p-5 shadow">
+                    <p className="text-sm text-gray-500">
+                        AI Completed
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {aiCompleted}
+                    </p>
+                </div>
+
+                <div className="min-h-24 rounded-lg bg-white p-5 shadow">
+                    <p className="text-sm text-gray-500">
+                        AI Processing
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {aiProcessing}
+                    </p>
+                </div>
+
+                <button
+                    onClick={() =>
+                        setAiStatusFilter(
+                            aiStatusFilter === "FAILED" ? "ALL" : "FAILED"
+                        )
+                    }
+                    className={`w-full rounded-lg bg-white p-4 text-left shadow hover:bg-gray-50 ${
+                        aiStatusFilter === "FAILED"
+                            ? "ring-2 ring-red-500"
+                            : ""
+                    }`}
+                >
+                    <p className="text-sm text-gray-500">
+                        AI Failed
+                    </p>
+
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {aiFailed}
+                    </p>
+                </button>
+            </div>
 
             <div
                 className="mt-8"
@@ -415,6 +520,33 @@ export default function Home() {
                                             ? "ticket"
                                             : "tickets"}
                                     </p>
+                                    {selectedCustomer === customer.id && (
+                                        <div className="mt-3 border-t border-gray-200 pt-3">
+                                            <p className="text-xs font-semibold text-gray-700">
+                                                Ticket History
+                                            </p>
+
+                                            <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                                                {tickets
+                                                    .filter((ticket) => ticket.customer?.id === customer.id)
+                                                    .map((ticket) => (
+                                                        <div
+                                                            key={ticket.id}
+                                                            onClick={() => setSelectedTicket(ticket)}
+                                                            className="cursor-pointer rounded-md bg-gray-50 p-2 hover:bg-gray-100"
+                                                        >
+                                                            <p className="text-sm font-medium text-gray-900">
+                                                                #{ticket.id} {ticket.subject}
+                                                            </p>
+
+                                                            <p className="text-xs text-gray-500">
+                                                                {ticket.status} · {ticket.priority}
+                                                            </p>
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
