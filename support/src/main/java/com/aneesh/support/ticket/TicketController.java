@@ -29,6 +29,7 @@ public class TicketController {
     private final AiServiceClient aiServiceClient;
     private final AgentRepository agentRepository;
     private final TicketAssignmentHistoryRepository ticketAssignmentHistoryRepository;
+    private final TicketActivityRepository ticketActivityRepository;
 
     public TicketController(
             TicketRepository ticketRepository,
@@ -36,13 +37,15 @@ public class TicketController {
             TicketEventProducer ticketEventProducer,
             AiServiceClient aiServiceClient,
             AgentRepository agentRepository,
-            TicketAssignmentHistoryRepository ticketAssignmentHistoryRepository) {
+            TicketAssignmentHistoryRepository ticketAssignmentHistoryRepository,
+            TicketActivityRepository ticketActivityRepository) {
         this.ticketRepository = ticketRepository;
         this.customerRepository = customerRepository;
         this.ticketEventProducer = ticketEventProducer;
         this.aiServiceClient = aiServiceClient;
         this.agentRepository = agentRepository;
         this.ticketAssignmentHistoryRepository = ticketAssignmentHistoryRepository;
+        this.ticketActivityRepository = ticketActivityRepository;
     }
 
     @PostMapping
@@ -61,6 +64,14 @@ public class TicketController {
         );
 
         Ticket savedTicket = ticketRepository.save(ticket);
+
+        TicketActivity activity = new TicketActivity(
+                savedTicket,
+                "TICKET_CREATED",
+                "Ticket created"
+        );
+
+        ticketActivityRepository.save(activity);
 
         TicketCreatedEvent event = new TicketCreatedEvent(
                 "TICKET_CREATED",
@@ -104,6 +115,10 @@ public class TicketController {
                         "Ticket not found: " + id
                 ));
 
+        TicketStatus oldStatus = ticket.getStatus();
+
+        TicketPriority oldPriority = ticket.getPriority();
+
         if (request.status() != null) {
             ticket.setStatus(request.status());
         }
@@ -120,7 +135,29 @@ public class TicketController {
             ticket.setDescription(request.description());
         }
 
-        return ticketRepository.save(ticket);
+        Ticket savedTicket = ticketRepository.save(ticket);
+
+        if (oldStatus != ticket.getStatus()) {
+            TicketActivity activity = new TicketActivity(
+                    ticket,
+                    "STATUS_CHANGED",
+                    "Status changed from " + oldStatus + " to " + ticket.getStatus()
+            );
+
+            ticketActivityRepository.save(activity);
+        }
+
+        if (oldPriority != ticket.getPriority()) {
+            TicketActivity activity = new TicketActivity(
+                    ticket,
+                    "PRIORITY_CHANGED",
+                    "Priority changed from " + oldPriority + " to " + ticket.getPriority()
+            );
+
+            ticketActivityRepository.save(activity);
+        }
+
+        return savedTicket;
     }
 
     @PatchMapping("/{id}/agent/{agentId}")
@@ -148,6 +185,14 @@ public class TicketController {
 
         ticketAssignmentHistoryRepository.save(history);
 
+        TicketActivity activity = new TicketActivity(
+                ticket,
+                "AGENT_ASSIGNED",
+                "Assigned to " + agent.getName()
+        );
+
+        ticketActivityRepository.save(activity);
+
         return ticket;
     }
 
@@ -172,6 +217,28 @@ public class TicketController {
                 .toList();
     }
 
+    @GetMapping("/{id}/activity")
+    public List<Map<String, Object>> getTicketActivity(
+            @PathVariable Long id
+    ) {
+        if (!ticketRepository.existsById(id)) {
+            throw new ResourceNotFoundException(
+                    "Ticket not found: " + id
+            );
+        }
+
+        return ticketActivityRepository
+                .findByTicketIdOrderByCreatedAtDesc(id)
+                .stream()
+                .map(activity -> Map.<String, Object>of(
+                        "id", activity.getId(),
+                        "activityType", activity.getActivityType(),
+                        "description", activity.getDescription(),
+                        "createdAt", activity.getCreatedAt()
+                ))
+                .toList();
+    }
+
     @PostMapping("/{id}/retry-ai")
     public Ticket retryAiAnalysis(@PathVariable Long id) {
 
@@ -179,6 +246,14 @@ public class TicketController {
                 .orElseThrow(() ->
                         new ResourceNotFoundException("Ticket not found: " + id)
                 );
+
+        TicketActivity activity = new TicketActivity(
+                ticket,
+                "AI_RETRY",
+                "AI analysis retry requested"
+        );
+
+        ticketActivityRepository.saveAndFlush(activity);
 
         ticketEventProducer.publishTicketCreated(
                 new TicketCreatedEvent(

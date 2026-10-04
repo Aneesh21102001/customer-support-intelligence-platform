@@ -33,6 +33,13 @@ type AssignmentHistory = {
     assignedAt: string;
 };
 
+type TicketActivity = {
+    id: number;
+    activityType: string;
+    description: string;
+    createdAt: string;
+};
+
 export default function Home() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -47,6 +54,7 @@ export default function Home() {
     const [assignmentHistory, setAssignmentHistory] = useState<
         AssignmentHistory[]
     >([]);
+    const [ticketActivity, setTicketActivity] = useState<TicketActivity[]>([]);
     const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
     const [newCustomerName, setNewCustomerName] = useState("");
     const [newCustomerEmail, setNewCustomerEmail] = useState("");
@@ -122,6 +130,25 @@ export default function Home() {
             .catch((error) => {
                 console.error("Failed to fetch assignment history:", error);
                 setAssignmentHistory([]);
+            });
+    }, [selectedTicket]);
+
+    useEffect(() => {
+        if (!selectedTicket) {
+            setTicketActivity([]);
+            return;
+        }
+
+        fetch(
+            `http://localhost:8080/api/tickets/${selectedTicket.id}/activity`
+        )
+            .then((response) => response.json())
+            .then((data) => {
+                setTicketActivity(data);
+            })
+            .catch((error) => {
+                console.error("Failed to fetch ticket activity:", error);
+                setTicketActivity([]);
             });
     }, [selectedTicket]);
 
@@ -1208,6 +1235,73 @@ export default function Home() {
                                                 <p className="mt-1 text-xs text-gray-400">
                                                     {new Date(history.assignedAt).toLocaleString()}
                                                 </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-4 rounded-lg bg-gray-50 p-4">
+                                <h3 className="font-semibold text-gray-900">
+                                    Ticket Activity
+                                </h3>
+
+                                {ticketActivity.length === 0 ? (
+                                    <p className="mt-2 text-sm text-gray-500">
+                                        No activity yet.
+                                    </p>
+                                ) : (
+                                    <div className="mt-3 space-y-4">
+                                        {ticketActivity.map((activity) => (
+                                            <div
+                                                key={activity.id}
+                                                className="flex gap-3"
+                                            >
+                                                <div className="flex flex-col items-center">
+                                                    <div
+                                                        className={`flex h-7 w-7 items-center justify-center rounded-full text-sm ${
+                                                            activity.activityType === "TICKET_CREATED"
+                                                                ? "bg-gray-100 text-gray-700"
+                                                                : activity.activityType === "AGENT_ASSIGNED"
+                                                                    ? "bg-blue-100 text-blue-700"
+                                                                    : activity.activityType === "STATUS_CHANGED"
+                                                                        ? "bg-purple-100 text-purple-700"
+                                                                        : activity.activityType === "PRIORITY_CHANGED"
+                                                                            ? "bg-amber-100 text-amber-700"
+                                                                            : activity.activityType === "AI_COMPLETED"
+                                                                                ? "bg-green-100 text-green-700"
+                                                                                : activity.activityType === "AI_FAILED"
+                                                                                    ? "bg-red-100 text-red-700"
+                                                                                    : activity.activityType === "AI_RETRY"
+                                                                                        ? "bg-yellow-100 text-yellow-700"
+                                                                                        : "bg-gray-100 text-gray-700"
+                                                        }`}
+                                                    >
+                                                        {activity.activityType === "TICKET_CREATED" && "＋"}
+                                                        {activity.activityType === "AGENT_ASSIGNED" && "→"}
+                                                        {activity.activityType === "STATUS_CHANGED" && "↻"}
+                                                        {activity.activityType === "PRIORITY_CHANGED" && "!"}
+                                                        {activity.activityType === "AI_COMPLETED" && "✓"}
+                                                        {activity.activityType === "AI_FAILED" && "⚠"}
+                                                        {activity.activityType === "AI_RETRY" && "↻"}
+                                                    </div>
+
+                                                    <div className="mt-1 h-full w-px bg-gray-200" />
+                                                </div>
+
+                                                <div className="pb-4">
+                                                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                                                        {activity.activityType.replace("_", " ")}
+                                                    </p>
+
+                                                    <p className="text-sm font-medium text-gray-900">
+                                                        {activity.description}
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-gray-400">
+                                                        {new Date(activity.createdAt).toLocaleString()}
+                                                    </p>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>

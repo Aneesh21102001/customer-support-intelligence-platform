@@ -2,9 +2,7 @@ package com.aneesh.support.kafka;
 
 import com.aneesh.support.ai.AiServiceClient;
 import com.aneesh.support.exception.ResourceNotFoundException;
-import com.aneesh.support.ticket.Ticket;
-import com.aneesh.support.ticket.TicketCreatedEvent;
-import com.aneesh.support.ticket.TicketRepository;
+import com.aneesh.support.ticket.*;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -12,13 +10,16 @@ public class TicketEventService {
 
     private final AiServiceClient aiServiceClient;
     private final TicketRepository ticketRepository;
+    private final TicketActivityRepository ticketActivityRepository;
 
     public TicketEventService(
             AiServiceClient aiServiceClient,
-            TicketRepository ticketRepository) {
+            TicketRepository ticketRepository,
+            TicketActivityRepository ticketActivityRepository) {
 
         this.aiServiceClient = aiServiceClient;
         this.ticketRepository = ticketRepository;
+        this.ticketActivityRepository = ticketActivityRepository;
     }
 
     public void processTicketCreated(TicketCreatedEvent event) {
@@ -79,6 +80,14 @@ public class TicketEventService {
 
             ticketRepository.save(ticket);
 
+            TicketActivity activity = new TicketActivity(
+                    ticket,
+                    "AI_COMPLETED",
+                    "AI analysis completed"
+            );
+
+            ticketActivityRepository.save(activity);
+
             System.out.println(
                     "AI analysis saved for ticket " + ticket.getId()
             );
@@ -91,10 +100,13 @@ public class TicketEventService {
 
             ticketRepository.save(ticket);
 
-            throw new RuntimeException(
-                    "Failed to process AI analysis for ticket " + ticket.getId(),
-                    e
+            TicketActivity activity = new TicketActivity(
+                    ticket,
+                    "AI_FAILED",
+                    "AI analysis failed"
             );
+
+            ticketActivityRepository.save(activity);
         }
     }
 }
