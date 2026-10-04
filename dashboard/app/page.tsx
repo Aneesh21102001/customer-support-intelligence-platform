@@ -11,6 +11,11 @@ type Ticket = {
         name: string;
         email: string;
     };
+    agent?: {
+        id: number;
+        name: string;
+        email: string;
+    };
     status: string;
     priority: string;
     category: string | null;
@@ -20,13 +25,27 @@ type Ticket = {
     aiStatus?: "PROCESSING" | "COMPLETED" | "FAILED";
 };
 
+type AssignmentHistory = {
+    id: number;
+    agentId: number;
+    agentName: string;
+    agentEmail: string;
+    assignedAt: string;
+};
+
 export default function Home() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
     const [loading, setLoading] = useState(true);
-    const [customerId, setCustomerId] = useState("1");
+    const [customerId, setCustomerId] = useState("");
     const [customers, setCustomers] = useState<
         { id: number; name: string; email: string }[]
+    >([]);
+    const [agents, setAgents] = useState<
+        { id: number; name: string; email: string }[]
+    >([]);
+    const [assignmentHistory, setAssignmentHistory] = useState<
+        AssignmentHistory[]
     >([]);
     const [selectedCustomer, setSelectedCustomer] = useState<number | null>(null);
     const [newCustomerName, setNewCustomerName] = useState("");
@@ -39,12 +58,15 @@ export default function Home() {
     const [createMessage, setCreateMessage] = useState("");
     const [updating, setUpdating] = useState(false);
     const [retryingAi, setRetryingAi] = useState(false);
+    const [assigningAgent, setAssigningAgent] = useState(false);
+    const [agentMessage, setAgentMessage] = useState("");
     const [updateStatus, setUpdateStatus] = useState("");
     const [updatePriority, setUpdatePriority] = useState("");
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [priorityFilter, setPriorityFilter] = useState("ALL");
     const [aiStatusFilter, setAiStatusFilter] = useState("ALL");
+    const [agentFilter, setAgentFilter] = useState("ALL");
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
@@ -72,6 +94,36 @@ export default function Home() {
                 console.error("Failed to fetch customers:", error);
             });
     }, []);
+
+    useEffect(() => {
+        fetch("http://localhost:8080/api/agents")
+            .then((response) => response.json())
+            .then((data) => {
+                setAgents(data);
+            })
+            .catch((error) => {
+                console.error("Failed to fetch agents:", error);
+            });
+    }, []);
+
+    useEffect(() => {
+        if (!selectedTicket) {
+            setAssignmentHistory([]);
+            return;
+        }
+
+        fetch(
+            `http://localhost:8080/api/tickets/${selectedTicket.id}/assignment-history`
+        )
+            .then((response) => response.json())
+            .then((data) => {
+                setAssignmentHistory(data);
+            })
+            .catch((error) => {
+                console.error("Failed to fetch assignment history:", error);
+                setAssignmentHistory([]);
+            });
+    }, [selectedTicket]);
 
     const createCustomer = async () => {
         if (!newCustomerName.trim() || !newCustomerEmail.trim()) {
@@ -106,6 +158,8 @@ export default function Home() {
                 newCustomer,
             ]);
 
+            setCustomerId(newCustomer.id.toString());
+
             setCustomerId(String(newCustomer.id));
             setNewCustomerName("");
             setNewCustomerEmail("");
@@ -124,6 +178,11 @@ export default function Home() {
     };
 
     const createTicket = async () => {
+        if (!customerId) {
+            setCreateMessage("Please select a customer.");
+            return;
+        }
+
         if (!subject.trim() || !description.trim()) {
             setCreateMessage("Subject and description are required.");
             return;
@@ -283,6 +342,46 @@ export default function Home() {
         }
     };
 
+    const assignAgent = async (agentId: string) => {
+        if (!selectedTicket) {
+            return;
+        }
+
+        setAssigningAgent(true);
+        setAgentMessage("");
+
+        try {
+            const response = await fetch(
+                `http://localhost:8080/api/tickets/${selectedTicket.id}/agent/${agentId}`,
+                {
+                    method: "PATCH",
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error("Failed to assign agent");
+            }
+
+            const updatedTicket = await response.json();
+
+            setTickets((currentTickets) =>
+                currentTickets.map((ticket) =>
+                    ticket.id === updatedTicket.id
+                        ? updatedTicket
+                        : ticket
+                )
+            );
+
+            setSelectedTicket(updatedTicket);
+            setAgentMessage("Agent assigned successfully.");
+        } catch (error) {
+            console.error("Failed to assign agent:", error);
+            setAgentMessage("Failed to assign agent.");
+        } finally {
+            setAssigningAgent(false);
+        }
+    };
+
     const retryAiAnalysis = async () => {
         if (!selectedTicket) {
             return;
@@ -322,18 +421,71 @@ export default function Home() {
         }
     };
 
-    const filteredTickets = tickets.filter((ticket) =>
-        (statusFilter === "ALL" || ticket.status === statusFilter) &&
-        (priorityFilter === "ALL" || ticket.priority === priorityFilter) &&
-        (selectedCustomer === null || ticket.customer?.id === selectedCustomer) &&
-        (aiStatusFilter === "ALL" || ticket.aiStatus === aiStatusFilter) &&
-        (
-            ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            ticket.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const supportStats = {
+        total: tickets.length,
+        open: tickets.filter((ticket) => ticket.status === "OPEN").length,
+        inProgress: tickets.filter((ticket) => ticket.status === "IN_PROGRESS").length,
+        resolved: tickets.filter((ticket) => ticket.status === "RESOLVED").length,
+        high: tickets.filter(
+            (ticket) => ticket.priority === "HIGH"
+        ).length,
+
+        urgent: tickets.filter(
+            (ticket) => ticket.priority === "URGENT"
+        ).length,
+        unassigned: tickets.filter((ticket) => !ticket.agent).length,
+        aiProcessing: tickets.filter(
+            (ticket) => ticket.aiStatus === "PROCESSING"
+        ).length,
+        aiFailed: tickets.filter(
+            (ticket) => ticket.aiStatus === "FAILED"
+        ).length,
+    };
+
+    const filteredTickets = tickets
+        .filter((ticket) =>
+            (statusFilter === "ALL" || ticket.status === statusFilter) &&
+            (
+                priorityFilter === "ALL" ||
+                ticket.priority === priorityFilter ||
+                (priorityFilter === "HIGH_URGENT" &&
+                    (ticket.priority === "HIGH" || ticket.priority === "URGENT"))
+            ) &&
+            (selectedCustomer === null || ticket.customer?.id === selectedCustomer) &&
+            (aiStatusFilter === "ALL" || ticket.aiStatus === aiStatusFilter) &&
+            agentFilter === "ALL" ||
+            (agentFilter === "UNASSIGNED" && !ticket.agent) ||
+            (agentFilter !== "UNASSIGNED" &&
+                String(ticket.agent?.id) === agentFilter) &&
+            (
+                ticket.id.toString().includes(searchTerm.replace("#", "").trim()) ||
+                ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                ticket.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                ticket.customer?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                ticket.agent?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                ticket.agent?.email.toLowerCase().includes(searchTerm.toLowerCase())
+            )
         )
-    );
+        .sort((a, b) => a.id - b.id);
 
     const totalTickets = tickets.length;
+
+    const agentWorkloads = agents.map((agent) => {
+        const agentTickets = tickets.filter(
+            (ticket) => ticket.agent?.id === agent.id
+        );
+
+        return {
+            ...agent,
+            ticketCount: agentTickets.length,
+            openTickets: agentTickets.filter(
+                (ticket) => ticket.status === "OPEN"
+            ).length,
+            resolvedTickets: agentTickets.filter(
+                (ticket) => ticket.status === "RESOLVED"
+            ).length,
+        };
+    });
 
     const totalCustomers = customers.length;
 
@@ -428,6 +580,40 @@ export default function Home() {
                     gap: "16px",
                 }}
             >
+                {agentWorkloads.map((agent) => (
+                    <div
+                        key={agent.id}
+                        className="min-h-24 rounded-lg bg-white p-5 shadow"
+                    >
+                        <p className="text-sm text-gray-500">
+                            {agent.name}
+                        </p>
+
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {agent.ticketCount}
+                        </p>
+
+                        <div className="mt-2 flex text-xs text-gray-500">
+                            <span>
+                                Open: {agent.openTickets}
+                            </span>
+
+                            <span style={{ marginLeft: "10px" }}>
+                                Resolved: {agent.resolvedTickets}
+                            </span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div
+                className="mt-4"
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "16px",
+                }}
+            >
                 <div className="min-h-24 rounded-lg bg-white p-5 shadow">
                     <p className="text-sm text-gray-500">
                         AI Completed
@@ -466,6 +652,133 @@ export default function Home() {
                         {aiFailed}
                     </p>
                 </button>
+            </div>
+
+            <div className="mb-6">
+                <h2 className="mb-3 text-lg font-semibold text-gray-900">
+                    Support Overview
+                </h2>
+
+                <div
+                    className="mt-6"
+                    style={{
+                        display: "grid",
+                        gridTemplateColumns: "repeat(3, 1fr)",
+                        gap: "16px",
+                    }}
+                >
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setStatusFilter("ALL");
+                            setPriorityFilter("ALL");
+                            setAgentFilter("ALL");
+                            setAiStatusFilter("ALL");
+                            setSearchTerm("");
+                            setCurrentPage(1);
+                        }}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">Total Tickets</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.total}
+                        </p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setStatusFilter("OPEN")}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">Open</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.open}
+                        </p>
+                    </button>
+
+                    <div className="rounded-lg bg-white p-4 shadow">
+                        <p className="text-sm text-gray-500">In Progress</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.inProgress}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setStatusFilter("RESOLVED")}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">Resolved</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.resolved}
+                        </p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setPriorityFilter("HIGH");
+                            setStatusFilter("ALL");
+                            setAgentFilter("ALL");
+                            setAiStatusFilter("ALL");
+                        }}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">High</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.high}
+                        </p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setPriorityFilter("URGENT");
+                            setStatusFilter("ALL");
+                            setAgentFilter("ALL");
+                            setAiStatusFilter("ALL");
+                        }}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">Urgent</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.urgent}
+                        </p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setAgentFilter("UNASSIGNED")}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">Unassigned</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.unassigned}
+                        </p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setAiStatusFilter("PROCESSING")}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">AI Processing</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.aiProcessing}
+                        </p>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => setAiStatusFilter("FAILED")}
+                        className="rounded-lg bg-white p-4 text-left shadow transition hover:shadow-md"
+                    >
+                        <p className="text-sm text-gray-500">AI Failed</p>
+                        <p className="mt-1 text-2xl font-bold text-gray-900">
+                            {supportStats.aiFailed}
+                        </p>
+                    </button>
+                </div>
             </div>
 
             <div
@@ -598,6 +911,7 @@ export default function Home() {
                             onChange={(e) => setCustomerId(e.target.value)}
                             className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
                         >
+                            <option value="">Select a customer</option>
                             {customers.map((customer) => (
                                 <option key={customer.id} value={customer.id}>
                                     {customer.name} ({customer.email})
@@ -648,7 +962,7 @@ export default function Home() {
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
                     >
-                        <option value="ALL">All Statuses</option>
+                        <option value="ALL">Status</option>
                         <option value="OPEN">OPEN</option>
                         <option value="IN_PROGRESS">IN_PROGRESS</option>
                         <option value="RESOLVED">RESOLVED</option>
@@ -660,11 +974,26 @@ export default function Home() {
                         onChange={(e) => setPriorityFilter(e.target.value)}
                         className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
                     >
-                        <option value="ALL">All Priorities</option>
+                        <option value="ALL">Priority</option>
                         <option value="LOW">LOW</option>
                         <option value="MEDIUM">MEDIUM</option>
                         <option value="HIGH">HIGH</option>
                         <option value="URGENT">URGENT</option>
+                    </select>
+
+                    <select
+                        value={agentFilter}
+                        onChange={(e) => setAgentFilter(e.target.value)}
+                        className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                    >
+                        <option value="ALL">Agents</option>
+                        <option value="UNASSIGNED">Unassigned</option>
+
+                        {agents.map((agent) => (
+                            <option key={agent.id} value={agent.id}>
+                                {agent.name}
+                            </option>
+                        ))}
                     </select>
 
                     <div
@@ -688,6 +1017,12 @@ export default function Home() {
                                 {ticket.customer && (
                                     <p className="mt-1 text-xs text-gray-500">
                                         {ticket.customer.name}
+                                    </p>
+                                )}
+
+                                {ticket.agent && (
+                                    <p className="mt-1 text-xs text-gray-500">
+                                        Agent: {ticket.agent.name}
                                     </p>
                                 )}
 
@@ -811,6 +1146,72 @@ export default function Home() {
                                 <span className="rounded-full bg-orange-100 px-3 py-1 font-medium text-orange-700">
                                     {selectedTicket.sentiment ?? "Pending"}
                                 </span>
+                            </div>
+
+                            <div className="mt-4 rounded-lg bg-gray-50 p-4">
+                                <h3 className="font-semibold text-gray-900">
+                                    Assigned Agent
+                                </h3>
+
+                                <p className="mt-1 text-sm text-gray-700">
+                                    {selectedTicket.agent
+                                        ? `${selectedTicket.agent.name} (${selectedTicket.agent.email})`
+                                        : "Unassigned"}
+                                </p>
+
+                                <select
+                                    value={selectedTicket.agent?.id ?? ""}
+                                    onChange={(e) => assignAgent(e.target.value)}
+                                    disabled={assigningAgent}
+                                    className="mt-3 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900"
+                                >
+                                    <option value="">Select an agent</option>
+
+                                    {agents.map((agent) => (
+                                        <option key={agent.id} value={agent.id}>
+                                            {agent.name} ({agent.email})
+                                        </option>
+                                    ))}
+                                </select>
+
+                                {agentMessage && (
+                                    <p className="mt-2 text-sm text-gray-600">
+                                        {agentMessage}
+                                    </p>
+                                )}
+                            </div>
+
+                            <div className="mt-4 rounded-lg bg-gray-50 p-4">
+                                <h3 className="font-semibold text-gray-900">
+                                    Assignment History
+                                </h3>
+
+                                {assignmentHistory.length === 0 ? (
+                                    <p className="mt-2 text-sm text-gray-500">
+                                        No assignment history yet.
+                                    </p>
+                                ) : (
+                                    <div className="mt-3 space-y-3">
+                                        {assignmentHistory.map((history) => (
+                                            <div
+                                                key={history.id}
+                                                className="border-l-2 border-blue-400 pl-3"
+                                            >
+                                                <p className="text-sm font-medium text-gray-900">
+                                                    {history.agentName}
+                                                </p>
+
+                                                <p className="text-xs text-gray-500">
+                                                    {history.agentEmail}
+                                                </p>
+
+                                                <p className="mt-1 text-xs text-gray-400">
+                                                    {new Date(history.assignedAt).toLocaleString()}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="mt-6 rounded-lg border border-gray-200 p-4">

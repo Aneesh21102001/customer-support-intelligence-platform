@@ -1,5 +1,6 @@
 package com.aneesh.support.ticket;
 
+import com.aneesh.support.agent.Agent;
 import com.aneesh.support.customer.Customer;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -20,6 +21,11 @@ public class Ticket {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "customer_id", nullable = false)
     private Customer customer;
+
+    @Setter
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "agent_id")
+    private Agent agent;
 
     @Setter
     @Column(nullable = false)
