@@ -6,6 +6,7 @@ type Ticket = {
     id: number;
     subject: string;
     description: string;
+    createdAt: string;
     customer?: {
         id: number;
         name: string;
@@ -75,6 +76,7 @@ export default function Home() {
     const [priorityFilter, setPriorityFilter] = useState("ALL");
     const [aiStatusFilter, setAiStatusFilter] = useState("ALL");
     const [agentFilter, setAgentFilter] = useState("ALL");
+    const [slaFilter, setSlaFilter] = useState("ALL");
     const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
@@ -186,8 +188,6 @@ export default function Home() {
             ]);
 
             setCustomerId(newCustomer.id.toString());
-
-            setCustomerId(String(newCustomer.id));
             setNewCustomerName("");
             setNewCustomerEmail("");
             setCustomerMessage("Customer created successfully.");
@@ -448,6 +448,41 @@ export default function Home() {
         }
     };
 
+    const getSlaStatus = (ticket: Ticket) => {
+        if (
+            ticket.status === "RESOLVED" ||
+            ticket.status === "CLOSED"
+        ) {
+            return "COMPLETED";
+        }
+
+        const slaHours = {
+            URGENT: 4,
+            HIGH: 8,
+            MEDIUM: 24,
+            LOW: 48,
+        };
+
+        const slaLimit =
+            slaHours[ticket.priority as keyof typeof slaHours];
+
+        const createdAt = new Date(ticket.createdAt).getTime();
+        const now = new Date().getTime();
+
+        const elapsedHours =
+            (now - createdAt) / (1000 * 60 * 60);
+
+        if (elapsedHours >= slaLimit) {
+            return "BREACHED";
+        }
+
+        if (elapsedHours >= slaLimit * 0.75) {
+            return "AT_RISK";
+        }
+
+        return "WITHIN_SLA";
+    };
+
     const supportStats = {
         total: tickets.length,
         open: tickets.filter((ticket) => ticket.status === "OPEN").length,
@@ -461,13 +496,42 @@ export default function Home() {
             (ticket) => ticket.priority === "URGENT"
         ).length,
         unassigned: tickets.filter((ticket) => !ticket.agent).length,
+        aiCompleted: tickets.filter(
+            (ticket) => ticket.aiStatus === "COMPLETED"
+        ).length,
+
         aiProcessing: tickets.filter(
             (ticket) => ticket.aiStatus === "PROCESSING"
         ).length,
+
         aiFailed: tickets.filter(
             (ticket) => ticket.aiStatus === "FAILED"
         ).length,
+
+        slaBreached: tickets.filter(
+            (ticket) => getSlaStatus(ticket) === "BREACHED"
+        ).length,
+
+        slaAtRisk: tickets.filter(
+            (ticket) => getSlaStatus(ticket) === "AT_RISK"
+        ).length,
+
+        slaWithin: tickets.filter(
+            (ticket) => getSlaStatus(ticket) === "WITHIN_SLA"
+        ).length,
     };
+
+    const aiTotal =
+        supportStats.aiCompleted +
+        supportStats.aiProcessing +
+        supportStats.aiFailed;
+
+    const aiSuccessRate =
+        aiTotal === 0
+            ? 0
+            : Math.round(
+                (supportStats.aiCompleted / aiTotal) * 100
+            );
 
     const filteredTickets = tickets
         .filter((ticket) =>
@@ -480,10 +544,13 @@ export default function Home() {
             ) &&
             (selectedCustomer === null || ticket.customer?.id === selectedCustomer) &&
             (aiStatusFilter === "ALL" || ticket.aiStatus === aiStatusFilter) &&
-            agentFilter === "ALL" ||
-            (agentFilter === "UNASSIGNED" && !ticket.agent) ||
-            (agentFilter !== "UNASSIGNED" &&
-                String(ticket.agent?.id) === agentFilter) &&
+            (slaFilter === "ALL" || getSlaStatus(ticket) === slaFilter) &&
+            (
+                agentFilter === "ALL" ||
+                (agentFilter === "UNASSIGNED" && !ticket.agent) ||
+                (agentFilter !== "UNASSIGNED" &&
+                    String(ticket.agent?.id) === agentFilter)
+            ) &&
             (
                 ticket.id.toString().includes(searchTerm.replace("#", "").trim()) ||
                 ticket.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -544,6 +611,62 @@ export default function Home() {
         startIndex,
         startIndex + ticketsPerPage
     );
+
+    const getAiProcessingDuration = () => {
+        const processingActivity = ticketActivity.find(
+            (activity) => activity.activityType === "AI_PROCESSING"
+        );
+
+        const completedActivity = ticketActivity.find(
+            (activity) => activity.activityType === "AI_COMPLETED"
+        );
+
+        if (!processingActivity || !completedActivity) {
+            return null;
+        }
+
+        const start = new Date(processingActivity.createdAt).getTime();
+        const end = new Date(completedActivity.createdAt).getTime();
+
+        const durationSeconds = Math.round((end - start) / 1000);
+
+        return durationSeconds;
+    };
+
+    const getRelativeTime = (dateString: string) => {
+        const date = new Date(dateString);
+        const now = new Date();
+
+        const diffSeconds = Math.floor(
+            (now.getTime() - date.getTime()) / 1000
+        );
+
+        if (diffSeconds < 60) {
+            return "just now";
+        }
+
+        const diffMinutes = Math.floor(diffSeconds / 60);
+
+        if (diffMinutes < 60) {
+            return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+        }
+
+        const diffHours = Math.floor(diffMinutes / 60);
+
+        if (diffHours < 24) {
+            return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+        }
+
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffDays < 30) {
+            return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+        }
+
+        const diffMonths = Math.floor(diffDays / 30);
+
+        return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
+    };
 
     if (loading) {
         return (
@@ -637,7 +760,7 @@ export default function Home() {
                 className="mt-4"
                 style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gridTemplateColumns: "repeat(4, 1fr)",
                     gap: "16px",
                 }}
             >
@@ -677,6 +800,72 @@ export default function Home() {
 
                     <p className="mt-1 text-2xl font-bold text-gray-900">
                         {aiFailed}
+                    </p>
+                </button>
+                <div className="rounded-lg bg-white p-4 shadow">
+                    <p className="text-sm text-gray-500">AI Success Rate</p>
+                    <p className="mt-1 text-2xl font-bold text-gray-900">
+                        {aiSuccessRate}%
+                    </p>
+                </div>
+            </div>
+
+            <div
+                className="mt-4"
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, 1fr)",
+                    gap: "16px",
+                }}
+            >
+                <button
+                    type="button"
+                    onClick={() => setSlaFilter("BREACHED")}
+                    className={`rounded-lg bg-white p-4 text-left shadow hover:bg-gray-50 ${
+                        slaFilter === "BREACHED"
+                            ? "ring-2 ring-blue-500"
+                            : ""
+                    }`}
+                >
+                    <p className="text-sm text-gray-500">
+                        SLA Breached
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-red-600">
+                        {supportStats.slaBreached}
+                    </p>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setSlaFilter("AT_RISK")}
+                    className={`rounded-lg bg-white p-4 text-left shadow hover:bg-gray-50 ${
+                        slaFilter === "AT_RISK"
+                            ? "ring-2 ring-blue-500"
+                            : ""
+                    }`}
+                >
+                    <p className="text-sm text-gray-500">
+                        SLA At Risk
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-orange-600">
+                        {supportStats.slaAtRisk}
+                    </p>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setSlaFilter("WITHIN_SLA")}
+                    className={`rounded-lg bg-white p-4 text-left shadow hover:bg-gray-50 ${
+                        slaFilter === "WITHIN_SLA"
+                            ? "ring-2 ring-blue-500"
+                            : ""
+                    }`}
+                >
+                    <p className="text-sm text-gray-500">
+                        Within SLA
+                    </p>
+                    <p className="mt-1 text-2xl font-bold text-green-600">
+                        {supportStats.slaWithin}
                     </p>
                 </button>
             </div>
@@ -881,6 +1070,10 @@ export default function Home() {
                                                                 #{ticket.id} {ticket.subject}
                                                             </p>
 
+                                                            <p className="mt-1 text-xs text-gray-500">
+                                                                Created {getRelativeTime(ticket.createdAt)}
+                                                            </p>
+
                                                             <p className="text-xs text-gray-500">
                                                                 {ticket.status} · {ticket.priority}
                                                             </p>
@@ -976,6 +1169,19 @@ export default function Home() {
                         )}
                     </div>
 
+                    {slaFilter !== "ALL" && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSlaFilter("ALL");
+                                setCurrentPage(1);
+                            }}
+                            className="mb-2 text-sm font-medium text-blue-600 hover:text-blue-800"
+                        >
+                            Clear SLA filter
+                        </button>
+                    )}
+
                     <input
                         type="text"
                         placeholder="Search tickets..."
@@ -1041,6 +1247,10 @@ export default function Home() {
                                     #{ticket.id} {ticket.subject}
                                 </h3>
 
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Created {getRelativeTime(ticket.createdAt)}
+                                </p>
+
                                 {ticket.customer && (
                                     <p className="mt-1 text-xs text-gray-500">
                                         {ticket.customer.name}
@@ -1077,6 +1287,26 @@ export default function Home() {
                                             {ticket.category}
                                         </span>
                                     )}
+
+                                    <span
+                                        className={`rounded-full px-2 py-1 text-xs font-medium ${
+                                            getSlaStatus(ticket) === "BREACHED"
+                                                ? "bg-red-100 text-red-700"
+                                                : getSlaStatus(ticket) === "AT_RISK"
+                                                    ? "bg-orange-100 text-orange-700"
+                                                    : getSlaStatus(ticket) === "COMPLETED"
+                                                        ? "bg-gray-100 text-gray-700"
+                                                        : "bg-green-100 text-green-700"
+                                        }`}
+                                    >
+                                        {getSlaStatus(ticket) === "BREACHED"
+                                            ? "SLA BREACHED"
+                                            : getSlaStatus(ticket) === "AT_RISK"
+                                                ? "SLA AT RISK"
+                                                : getSlaStatus(ticket) === "COMPLETED"
+                                                    ? "SLA COMPLETED"
+                                                    : "WITHIN SLA"}
+                                    </span>
                                 </div>
                             </button>
                         ))}
@@ -1270,6 +1500,8 @@ export default function Home() {
                                                                             ? "bg-amber-100 text-amber-700"
                                                                             : activity.activityType === "AI_COMPLETED"
                                                                                 ? "bg-green-100 text-green-700"
+                                                                                : activity.activityType === "AI_PROCESSING"
+                                                                                    ? "bg-blue-100 text-blue-700"
                                                                                 : activity.activityType === "AI_FAILED"
                                                                                     ? "bg-red-100 text-red-700"
                                                                                     : activity.activityType === "AI_RETRY"
@@ -1281,6 +1513,7 @@ export default function Home() {
                                                         {activity.activityType === "AGENT_ASSIGNED" && "→"}
                                                         {activity.activityType === "STATUS_CHANGED" && "↻"}
                                                         {activity.activityType === "PRIORITY_CHANGED" && "!"}
+                                                        {activity.activityType === "AI_PROCESSING" && "…"}
                                                         {activity.activityType === "AI_COMPLETED" && "✓"}
                                                         {activity.activityType === "AI_FAILED" && "⚠"}
                                                         {activity.activityType === "AI_RETRY" && "↻"}
@@ -1301,6 +1534,13 @@ export default function Home() {
                                                     <p className="mt-1 text-xs text-gray-400">
                                                         {new Date(activity.createdAt).toLocaleString()}
                                                     </p>
+                                                    {activity.activityType === "AI_COMPLETED" &&
+                                                        getAiProcessingDuration() !== null && (
+                                                            <p className="mt-1 text-xs text-gray-500">
+                                                                Processing time: {getAiProcessingDuration()}s
+                                                            </p>
+                                                        )
+                                                    }
                                                 </div>
                                             </div>
                                         ))}

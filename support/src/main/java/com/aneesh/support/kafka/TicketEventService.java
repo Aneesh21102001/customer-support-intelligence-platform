@@ -3,6 +3,7 @@ package com.aneesh.support.kafka;
 import com.aneesh.support.ai.AiServiceClient;
 import com.aneesh.support.exception.ResourceNotFoundException;
 import com.aneesh.support.ticket.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -35,30 +36,41 @@ public class TicketEventService {
                         )
                 );
 
-        ticket.setAiStatus(
-                com.aneesh.support.ticket.AiProcessingStatus.PROCESSING
-        );
-
+        ticket.setAiStatus(AiProcessingStatus.PROCESSING);
         ticketRepository.save(ticket);
 
+        TicketActivity processingActivity = new TicketActivity(
+                ticket,
+                "AI_PROCESSING",
+                "AI analysis started"
+        );
+
+        ticketActivityRepository.save(processingActivity);
+
         try {
+
             String analysis = aiServiceClient.analyzeTicket(
                     ticket.getSubject(),
                     ticket.getDescription()
             );
 
-            String json = analysis;
-            var objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            ObjectMapper objectMapper = new ObjectMapper();
 
-            var result = objectMapper.readTree(json);
+            var result = objectMapper.readTree(analysis);
 
-            ticket.setCategory(result.get("category").asText());
+            ticket.setCategory(
+                    result.get("category").asText()
+            );
+
             ticket.setPriority(
-                    com.aneesh.support.ticket.TicketPriority.valueOf(
+                    TicketPriority.valueOf(
                             result.get("priority").asText()
                     )
             );
-            ticket.setSentiment(result.get("sentiment").asText());
+
+            ticket.setSentiment(
+                    result.get("sentiment").asText()
+            );
 
             ticket.setSuggestedResponse(
                     result.get("suggested_response").asText()
@@ -74,19 +86,17 @@ public class TicketEventService {
                     )
             );
 
-            ticket.setAiStatus(
-                    com.aneesh.support.ticket.AiProcessingStatus.COMPLETED
-            );
+            ticket.setAiStatus(AiProcessingStatus.COMPLETED);
 
             ticketRepository.save(ticket);
 
-            TicketActivity activity = new TicketActivity(
+            TicketActivity completedActivity = new TicketActivity(
                     ticket,
                     "AI_COMPLETED",
                     "AI analysis completed"
             );
 
-            ticketActivityRepository.save(activity);
+            ticketActivityRepository.save(completedActivity);
 
             System.out.println(
                     "AI analysis saved for ticket " + ticket.getId()
@@ -94,19 +104,21 @@ public class TicketEventService {
 
         } catch (Exception e) {
 
-            ticket.setAiStatus(
-                    com.aneesh.support.ticket.AiProcessingStatus.FAILED
-            );
-
+            ticket.setAiStatus(AiProcessingStatus.FAILED);
             ticketRepository.save(ticket);
 
-            TicketActivity activity = new TicketActivity(
+            TicketActivity failedActivity = new TicketActivity(
                     ticket,
                     "AI_FAILED",
                     "AI analysis failed"
             );
 
-            ticketActivityRepository.save(activity);
+            ticketActivityRepository.save(failedActivity);
+
+            System.err.println(
+                    "AI analysis failed for ticket " + ticket.getId()
+                            + ": " + e.getMessage()
+            );
         }
     }
 }
