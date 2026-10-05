@@ -9,7 +9,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -84,5 +84,30 @@ class CustomerControllerTest {
                             """.formatted(email))
                 )
                 .andExpect(status().isConflict());
+    }
+
+    @Test
+    void shouldGetCustomers() throws Exception {
+
+        String email = "get-" + UUID.randomUUID() + "@example.com";
+
+        mockMvc.perform(
+                        post("/api/customers")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                            {
+                                "name": "Get Test Customer",
+                                "email": "%s"
+                            }
+                            """.formatted(email))
+                )
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(
+                        get("/api/customers")
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$[?(@.email == '%s')]".formatted(email)).exists());
     }
 }
