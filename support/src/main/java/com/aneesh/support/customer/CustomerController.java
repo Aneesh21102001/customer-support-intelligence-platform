@@ -1,5 +1,6 @@
 package com.aneesh.support.customer;
 
+import com.aneesh.support.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -40,7 +41,7 @@ public class CustomerController {
     @GetMapping("/{id}")
     public Customer getCustomer(@PathVariable Long id) {
         return customerRepository.findById(id)
-                .orElseThrow();
+                .orElseThrow(() -> new ResourceNotFoundException("Customer not found"));
     }
 
     public record CreateCustomerRequest(

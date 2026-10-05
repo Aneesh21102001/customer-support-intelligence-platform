@@ -6,6 +6,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 
 import java.util.UUID;
 
@@ -109,5 +110,50 @@ class CustomerControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$[?(@.email == '%s')]".formatted(email)).exists());
+    }
+
+    @Test
+    void shouldGetCustomerById() throws Exception {
+
+        String email = "get-by-id-" + UUID.randomUUID() + "@example.com";
+
+        String response = mockMvc.perform(
+                        post("/api/customers")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                            {
+                                "name": "Get By ID Customer",
+                                "email": "%s"
+                            }
+                            """.formatted(email))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        long customerId = JsonMapper
+                .builder()
+                .build()
+                .readTree(response)
+                .get("id")
+                .asLong();
+
+        mockMvc.perform(
+                        get("/api/customers/" + customerId)
+                )
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(customerId))
+                .andExpect(jsonPath("$.name").value("Get By ID Customer"))
+                .andExpect(jsonPath("$.email").value(email));
+    }
+
+    @Test
+    void shouldReturnNotFoundForUnknownCustomer() throws Exception {
+
+        mockMvc.perform(
+                        get("/api/customers/999999999")
+                )
+                .andExpect(status().isNotFound());
     }
 }
