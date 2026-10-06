@@ -119,6 +119,11 @@ public class TicketEventService {
                     "AI analysis failed for ticket " + ticket.getId()
                             + ": " + e.getMessage()
             );
+
+            throw new RuntimeException(
+                    "AI analysis failed for ticket " + ticket.getId(),
+                    e
+            );
         }
     }
 }

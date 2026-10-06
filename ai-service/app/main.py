@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
-from app.rag import build_rag_context, get_knowledge_sources
+from app.rag import get_rag_results, build_rag_context, get_knowledge_sources
 
 load_dotenv()
 
@@ -36,13 +36,13 @@ def health():
 @app.post("/analyze-ticket", response_model=TicketAnalysis)
 def analyze_ticket(ticket: TicketRequest):
 
-    context = build_rag_context(
-        f"{ticket.subject}\n{ticket.description}"
-    )
+    query = f"{ticket.subject}\n{ticket.description}"
 
-    sources = get_knowledge_sources(
-        f"{ticket.subject}\n{ticket.description}"
-    )
+    rag_results = get_rag_results(query)
+
+    context = build_rag_context(rag_results)
+
+    sources = get_knowledge_sources(rag_results)
 
     prompt = f"""
 You are a customer support AI assistant.

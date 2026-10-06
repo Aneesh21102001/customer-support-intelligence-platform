@@ -61,11 +61,30 @@ def search_knowledge(query: str, n_results: int = 2):
         n_results=n_results
     )
 
+    filtered_documents = []
+    filtered_metadatas = []
+    filtered_distances = []
+
+    for document, metadata, distance in zip(
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0]
+    ):
+        if distance <= 1.0:
+            filtered_documents.append(document)
+            filtered_metadatas.append(metadata)
+            filtered_distances.append(distance)
+
+    results["documents"][0] = filtered_documents
+    results["metadatas"][0] = filtered_metadatas
+    results["distances"][0] = filtered_distances
+
     return results
 
-def build_rag_context(query: str, n_results: int = 2):
-    results = search_knowledge(query, n_results)
+def get_rag_results(query: str, n_results: int = 2):
+    return search_knowledge(query, n_results)
 
+def build_rag_context(results):
     context_parts = []
 
     for document, metadata in zip(
@@ -78,9 +97,7 @@ def build_rag_context(query: str, n_results: int = 2):
 
     return "\n\n".join(context_parts)
 
-def get_knowledge_sources(query: str, n_results: int = 2):
-    results = search_knowledge(query, n_results)
-
+def get_knowledge_sources(results):
     sources = []
 
     for metadata in results["metadatas"][0]:
