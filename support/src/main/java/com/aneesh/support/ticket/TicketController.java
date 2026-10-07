@@ -2,12 +2,10 @@ package com.aneesh.support.ticket;
 
 import com.aneesh.support.agent.Agent;
 import com.aneesh.support.agent.AgentRepository;
-import com.aneesh.support.ai.AiServiceClient;
 import com.aneesh.support.customer.Customer;
 import com.aneesh.support.customer.CustomerRepository;
 import com.aneesh.support.exception.ResourceNotFoundException;
 import com.aneesh.support.kafka.TicketEventProducer;
-import com.aneesh.support.ticket.TicketAssignmentHistoryRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -26,7 +24,6 @@ public class TicketController {
     private final TicketRepository ticketRepository;
     private final CustomerRepository customerRepository;
     private final TicketEventProducer ticketEventProducer;
-    private final AiServiceClient aiServiceClient;
     private final AgentRepository agentRepository;
     private final TicketAssignmentHistoryRepository ticketAssignmentHistoryRepository;
     private final TicketActivityRepository ticketActivityRepository;
@@ -35,14 +32,12 @@ public class TicketController {
             TicketRepository ticketRepository,
             CustomerRepository customerRepository,
             TicketEventProducer ticketEventProducer,
-            AiServiceClient aiServiceClient,
             AgentRepository agentRepository,
             TicketAssignmentHistoryRepository ticketAssignmentHistoryRepository,
             TicketActivityRepository ticketActivityRepository) {
         this.ticketRepository = ticketRepository;
         this.customerRepository = customerRepository;
         this.ticketEventProducer = ticketEventProducer;
-        this.aiServiceClient = aiServiceClient;
         this.agentRepository = agentRepository;
         this.ticketAssignmentHistoryRepository = ticketAssignmentHistoryRepository;
         this.ticketActivityRepository = ticketActivityRepository;
@@ -95,14 +90,6 @@ public class TicketController {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Ticket not found: " + id
                 ));
-    }
-
-    @GetMapping("/ai-test")
-    public String testAi() {
-        return aiServiceClient.analyzeTicket(
-                "Payment failed",
-                "Customer payment is failing during checkout"
-        );
     }
 
     @PatchMapping("/{id}")

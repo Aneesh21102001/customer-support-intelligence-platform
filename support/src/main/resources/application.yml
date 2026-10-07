@@ -3,9 +3,9 @@ spring:
     name: customer-support-platform
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/support_platform
-    username: support_user
-    password: support_password
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/support_platform
+    username: ${DB_USERNAME:support_user}
+    password: ${DB_PASSWORD:support_password}
     hikari:
       connection-init-sql: SET TIME ZONE 'Asia/Kolkata'
 
@@ -18,7 +18,7 @@ spring:
         format_sql: true
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
     listener:
       ack-mode: record

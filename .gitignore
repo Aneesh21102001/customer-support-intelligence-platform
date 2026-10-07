@@ -9,3 +9,4 @@ __pycache__/
 chroma_db/
 node_modules/
 .next/
+support_platform_backup.sql

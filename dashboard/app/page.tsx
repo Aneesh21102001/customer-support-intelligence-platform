@@ -262,9 +262,7 @@ export default function Home() {
                     const updatedTicket = await updatedResponse.json();
 
                     updatedTicket.aiStatus =
-                        updatedTicket.category && updatedTicket.suggestedResponse
-                            ? "COMPLETED"
-                            : "PROCESSING";
+                        updatedTicket.aiStatus ?? "PROCESSING";
 
                     setTickets((currentTickets) =>
                         currentTickets.map((ticket) =>
@@ -278,8 +276,8 @@ export default function Home() {
 
                     // AI processing is complete
                     if (
-                        updatedTicket.category &&
-                        updatedTicket.suggestedResponse
+                        updatedTicket.aiStatus === "COMPLETED" ||
+                        updatedTicket.aiStatus === "FAILED"
                     ) {
                         return;
                     }
