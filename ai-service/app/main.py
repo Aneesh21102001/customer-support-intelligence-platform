@@ -4,7 +4,12 @@ from fastapi import FastAPI
 from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel
-from app.rag import get_rag_results, build_rag_context, get_knowledge_sources
+from app.rag import (
+    ingest_documents,
+    get_rag_results,
+    build_rag_context,
+    get_knowledge_sources
+)
 
 load_dotenv()
 
@@ -14,6 +19,8 @@ app = FastAPI(
     title="Customer Support AI Service",
     version="1.0.0"
 )
+
+ingest_documents()
 
 class TicketRequest(BaseModel):
     subject: str

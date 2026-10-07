@@ -38,6 +38,8 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
       - "8000:8000"
+    volumes:
+      - ${USERPROFILE}/.cache/chroma:/root/.cache/chroma
 
   support:
     build:
