@@ -65,3 +65,43 @@ def test_analyze_ticket_requires_subject_and_description():
     )
 
     assert response.status_code == 422
+
+def test_payment_safety_blocks_retry_when_money_was_deducted():
+    response = main.enforce_payment_safety(
+        subject="Payment deducted but order not confirmed",
+        description=(
+            "The payment was deducted from my bank account, "
+            "but the order page still shows payment pending. "
+            "I have not received an order confirmation email."
+        ),
+        suggested_response="Please retry the payment after a few minutes.",
+    )
+
+    assert "avoid making another payment" in response.lower()
+    assert "payment and order status need to be verified" in response.lower()
+    assert "retry the payment" not in response.lower()
+    assert "cannot confirm whether a refund is due" in response.lower()
+
+def test_payment_safety_preserves_normal_failed_payment_response():
+    original_response = "Please retry the payment after checking the billing address."
+
+    response = main.enforce_payment_safety(
+        subject="Payment failed",
+        description="My checkout payment failed. Please help me resolve the issue.",
+        suggested_response=original_response,
+    )
+
+    assert response == original_response
+
+def test_payment_safety_does_not_promise_a_refund():
+    response = main.enforce_payment_safety(
+        subject="Payment deducted but order not confirmed",
+        description=(
+            "The payment was deducted from my bank account, "
+            "but the order still shows payment pending."
+        ),
+        suggested_response="Your refund is guaranteed.",
+    )
+
+    assert "refund is guaranteed" not in response.lower()
+    assert "cannot confirm whether a refund is due" in response.lower()

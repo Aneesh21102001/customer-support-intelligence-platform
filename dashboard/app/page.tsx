@@ -88,7 +88,20 @@ export default function Home() {
             .then((response) => response.json())
             .then((data) => {
                 setTickets(data);
-                setSelectedTicket(data[0] ?? null);
+
+                setSelectedTicket((currentTicket) => {
+                    if (currentTicket) {
+                        const refreshedTicket = data.find(
+                            (ticket: Ticket) => ticket.id === currentTicket.id
+                        );
+
+                        if (refreshedTicket) {
+                            return refreshedTicket;
+                        }
+                    }
+
+                    return data[0] ?? null;
+                });
                 setLoading(false);
             })
             .catch((error) => {
@@ -153,6 +166,47 @@ export default function Home() {
                 setTicketActivity([]);
             });
     }, [selectedTicket]);
+
+    const pollForAiResult = async (ticketId: number) => {
+        for (let attempt = 1; attempt <= 10; attempt++) {
+            try {
+                const response = await fetch(
+                    `http://localhost:8080/api/tickets/${ticketId}`
+                );
+
+                if (!response.ok) {
+                    throw new Error("Failed to fetch updated ticket");
+                }
+
+                const updatedTicket: Ticket = await response.json();
+
+                setTickets((currentTickets) =>
+                    currentTickets.map((ticket) =>
+                        ticket.id === updatedTicket.id
+                            ? updatedTicket
+                            : ticket
+                    )
+                );
+
+                setSelectedTicket((currentTicket) =>
+                    currentTicket?.id === updatedTicket.id
+                        ? updatedTicket
+                        : currentTicket
+                );
+
+                if (
+                    updatedTicket.aiStatus === "COMPLETED" ||
+                    updatedTicket.aiStatus === "FAILED"
+                ) {
+                    return;
+                }
+            } catch (error) {
+                console.error("Failed to refresh ticket:", error);
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+    };
 
     const createCustomer = async () => {
         if (!newCustomerName.trim() || !newCustomerEmail.trim()) {
@@ -248,67 +302,8 @@ export default function Home() {
             newTicket.aiStatus = "PROCESSING";
             setSelectedTicket(newTicket);
 
-            // Give Kafka + AI time to process the ticket
-            const pollForAiResult = async (attempt = 1) => {
-                try {
-                    const updatedResponse = await fetch(
-                        `http://localhost:8080/api/tickets/${newTicket.id}`
-                    );
-
-                    if (!updatedResponse.ok) {
-                        throw new Error("Failed to fetch updated ticket");
-                    }
-
-                    const updatedTicket = await updatedResponse.json();
-
-                    updatedTicket.aiStatus =
-                        updatedTicket.aiStatus ?? "PROCESSING";
-
-                    setTickets((currentTickets) =>
-                        currentTickets.map((ticket) =>
-                            ticket.id === updatedTicket.id
-                                ? updatedTicket
-                                : ticket
-                        )
-                    );
-
-                    setSelectedTicket(updatedTicket);
-
-                    // AI processing is complete
-                    if (
-                        updatedTicket.aiStatus === "COMPLETED" ||
-                        updatedTicket.aiStatus === "FAILED"
-                    ) {
-                        return;
-                    }
-
-                    // Try again every second, up to 10 attempts
-                    if (attempt < 10) {
-                        setTimeout(() => {
-                            pollForAiResult(attempt + 1);
-                        }, 1000);
-                    } else {
-                        updatedTicket.aiStatus = "FAILED";
-
-                        setTickets((currentTickets) =>
-                            currentTickets.map((ticket) =>
-                                ticket.id === updatedTicket.id
-                                    ? updatedTicket
-                                    : ticket
-                            )
-                        );
-
-                        setSelectedTicket(updatedTicket);
-                    }
-                } catch (error) {
-                    console.error(
-                        "Failed to refresh ticket:",
-                        error
-                    );
-                }
-            };
-
-            pollForAiResult();
+            // Poll until AI analysis completes or fails
+            pollForAiResult(newTicket.id);
 
             // Add the new ticket to the list
             setTickets((currentTickets) => [
@@ -426,7 +421,7 @@ export default function Home() {
                 throw new Error("Failed to retry AI analysis");
             }
 
-            const ticket = await response.json();
+            const ticket: Ticket = await response.json();
 
             ticket.aiStatus = "PROCESSING";
 
@@ -439,6 +434,9 @@ export default function Home() {
             );
 
             setSelectedTicket(ticket);
+
+            // Poll for the final AI result
+            await pollForAiResult(ticket.id);
         } catch (error) {
             console.error("Failed to retry AI analysis:", error);
         } finally {
@@ -1592,16 +1590,26 @@ export default function Home() {
                                 </div>
                             )}
 
-                            {selectedTicket.aiStatus === "FAILED" && (
-                                <div className="mt-5 rounded-lg bg-red-50 p-4">
-                                    <p className="text-sm font-medium text-red-800">
-                                        AI analysis failed. Please try again later.
-                                    </p>
+                            {(selectedTicket.aiStatus === "FAILED" ||
+                                selectedTicket.aiStatus === "COMPLETED") && (
+                                <div className="mt-5 rounded-lg border border-gray-200 bg-white p-4">
+                                    {selectedTicket.aiStatus === "FAILED" && (
+                                        <p className="text-sm font-medium text-red-800">
+                                            AI analysis failed. You can retry the analysis.
+                                        </p>
+                                    )}
+
+                                    {selectedTicket.aiStatus === "COMPLETED" && (
+                                        <p className="text-sm text-gray-600">
+                                            Need to refresh the AI analysis? You can run it again.
+                                        </p>
+                                    )}
 
                                     <button
+                                        type="button"
                                         onClick={retryAiAnalysis}
                                         disabled={retryingAi}
-                                        className="mt-3 rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                                        className="mt-3 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         {retryingAi ? "Retrying..." : "Retry AI Analysis"}
                                     </button>
