@@ -1,16 +1,13 @@
+import os
 from unittest.mock import patch, MagicMock
+
+os.environ.setdefault("OPENAI_API_KEY", "test-api-key")
 
 from fastapi.testclient import TestClient
 
 from app import main
 
-import os
-
-os.environ.setdefault("OPENAI_API_KEY", "test-api-key")
-
-
 client = TestClient(main.app)
-
 
 def test_health_endpoint():
     response = client.get("/health")
