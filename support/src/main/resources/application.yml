@@ -12,10 +12,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
@@ -34,3 +34,9 @@ spring:
       properties:
         spring.json.trusted.packages: com.aneesh.support.ticket
         spring.json.value.default.type: com.aneesh.support.ticket.TicketCreatedEvent
+
+logging:
+  level:
+    root: INFO
+    com.aneesh.support: INFO
+    org.springframework.kafka: INFO
