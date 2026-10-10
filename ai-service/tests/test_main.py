@@ -1,9 +1,12 @@
-
 from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 
 from app import main
+
+import os
+
+os.environ.setdefault("OPENAI_API_KEY", "test-api-key")
 
 
 client = TestClient(main.app)
