@@ -12,6 +12,31 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
 
+    env:
+      DB_HOST: localhost
+      DB_USERNAME: support_user
+      DB_PASSWORD: support_password
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: support_platform
+          POSTGRES_USER: support_user
+          POSTGRES_PASSWORD: support_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U support_user -d support_platform"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      kafka:
+        image: apache/kafka:4.0.1
+        ports:
+          - 9092:9092
+
     defaults:
       run:
         working-directory: support
