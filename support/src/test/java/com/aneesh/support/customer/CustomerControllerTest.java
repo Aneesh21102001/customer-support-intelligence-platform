@@ -154,6 +154,29 @@ class CustomerControllerTest {
         mockMvc.perform(
                         get("/api/customers/999999999")
                 )
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value("Customer not found"));
+    }
+
+    @Test
+    void shouldRejectMalformedJson() throws Exception {
+        mockMvc.perform(
+                        post("/api/customers")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+            {
+                "name": "Broken Customer",
+                "email":
+            }
+            """)
+                )
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value(
+                        "Request contains invalid or malformed data"
+                ));
     }
 }
