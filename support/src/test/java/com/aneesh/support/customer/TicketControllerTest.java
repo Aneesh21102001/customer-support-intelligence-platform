@@ -121,7 +121,10 @@ class TicketControllerTest {
         mockMvc.perform(
                         get("/api/tickets/999999999")
                 )
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value("Ticket not found: 999999999"));
     }
 
     @Test
