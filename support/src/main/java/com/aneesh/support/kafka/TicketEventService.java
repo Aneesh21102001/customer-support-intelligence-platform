@@ -5,6 +5,8 @@ import com.aneesh.support.exception.ResourceNotFoundException;
 import com.aneesh.support.ticket.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class TicketEventService {
@@ -12,6 +14,7 @@ public class TicketEventService {
     private final AiServiceClient aiServiceClient;
     private final TicketRepository ticketRepository;
     private final TicketActivityRepository ticketActivityRepository;
+    private static final Logger log = LoggerFactory.getLogger(TicketEventService.class);
 
     public TicketEventService(
             AiServiceClient aiServiceClient,
@@ -25,8 +28,11 @@ public class TicketEventService {
 
     public void processTicketCreated(TicketCreatedEvent event) {
 
-        System.out.println(
-                "Processing ticket created event: " + event
+        log.info(
+                "Processing ticket event: eventType={}, ticketId={}, customerId={}",
+                event.eventType(),
+                event.ticketId(),
+                event.customerId()
         );
 
         Ticket ticket = ticketRepository.findById(event.ticketId())
@@ -98,8 +104,10 @@ public class TicketEventService {
 
             ticketActivityRepository.save(completedActivity);
 
-            System.out.println(
-                    "AI analysis saved for ticket " + ticket.getId()
+            log.info(
+                    "AI analysis completed: ticketId={}, aiStatus={}",
+                    ticket.getId(),
+                    ticket.getAiStatus()
             );
 
         } catch (Exception e) {
@@ -115,9 +123,11 @@ public class TicketEventService {
 
             ticketActivityRepository.save(failedActivity);
 
-            System.err.println(
-                    "AI analysis failed for ticket " + ticket.getId()
-                            + ": " + e.getMessage()
+            log.error(
+                    "AI analysis failed: ticketId={}, error={}",
+                    ticket.getId(),
+                    e.getMessage(),
+                    e
             );
 
             throw new RuntimeException(
