@@ -17,8 +17,8 @@ A full-stack customer support platform that combines ticket management, AI-power
 
 | Component | Technologies |
 |---|---|
-| Frontend | Next.js, TypeScript, Tailwind CSS |
-| Backend | Java 21, Spring Boot 3.5 |
+| Frontend | Next.js 16, TypeScript, Tailwind CSS |
+| Backend | Java 21, Spring Boot 3.5.6 |
 | Database | PostgreSQL 16 |
 | Messaging | Apache Kafka |
 | AI Service | Python, FastAPI, OpenAI |
@@ -44,7 +44,17 @@ A full-stack customer support platform that combines ticket management, AI-power
 
 ### Start the application
 
-Clone the repository, navigate to the project directory, and start the services:
+Clone the repository and navigate to the project directory.
+
+Build the Spring Boot backend JAR:
+
+```powershell
+cd support
+.\mvnw.cmd clean package -DskipTests
+cd ..
+```
+
+Start the complete application stack:
 
 ```bash
 docker compose up -d --build
@@ -54,16 +64,36 @@ Configure `OPENAI_API_KEY` in your local environment before starting the AI serv
 
 ### Access the services
 
-- Dashboard: http://localhost:3000
-- Backend health: http://localhost:8080/actuator/health
-- AI service health: http://localhost:8000/health
+- Dashboard: [http://localhost:3000](http://localhost:3000)
+- Backend health: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+- AI service health: [http://localhost:8000/health](http://localhost:8000/health)
+
+## API Overview
+
+### Customers
+
+- `POST /api/customers` - Create a customer
+- `GET /api/customers` - List customers
+- `GET /api/customers/{id}` - Get a customer
+
+### Agents
+
+- `POST /api/agents` - Create an agent
+- `GET /api/agents` - List agents
+
+### Tickets
+
+- `POST /api/tickets` - Create a ticket
+- `GET /api/tickets` - List and filter tickets
+- `GET /api/tickets/{id}` - Get ticket details
+- `POST /api/tickets/{id}/retry-ai` - Retry AI analysis
 
 ## Automated Tests
 
-The project currently has **31 automated tests**:
+The project currently has **40 automated tests across the backend and AI service**:
 
-- Backend: 22 tests
-- AI service: 9 tests
+- Backend: 28 tests
+- AI service: 12 tests
 
 Both backend and AI service test jobs pass in GitHub Actions.
 
@@ -77,7 +107,7 @@ Both backend and AI service test jobs pass in GitHub Actions.
 
 ## Project Status
 
-Core ticket management, AI analysis, knowledge retrieval, event processing, dashboard functionality, and automated tests are implemented. Further improvements and deployment work may follow.
+Core ticket management, AI analysis, RAG-based knowledge retrieval, Kafka event processing with retry/DLT handling, agent assignment, activity auditing, and the interactive dashboard are implemented and tested. The application runs locally as a Docker Compose stack.
 
 ## License
 
