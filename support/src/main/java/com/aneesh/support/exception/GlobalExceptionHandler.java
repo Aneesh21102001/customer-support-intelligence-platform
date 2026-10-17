@@ -53,7 +53,7 @@ public class GlobalExceptionHandler {
                 "timestamp", LocalDateTime.now(),
                 "status", 409,
                 "error", "Conflict",
-                "message", "Customer with this email already exists"
+                "message", "A resource with this email already exists"
         );
     }
 
