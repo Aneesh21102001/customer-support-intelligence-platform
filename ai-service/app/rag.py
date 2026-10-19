@@ -70,7 +70,7 @@ def search_knowledge(query: str, n_results: int = 2):
             results["metadatas"][0],
             results["distances"][0]
     ):
-        if distance <= 1.0:
+        if distance <= 1.2:
             filtered_documents.append(document)
             filtered_metadatas.append(metadata)
             filtered_distances.append(distance)
