@@ -1,114 +1,166 @@
-# Customer Support Intelligence Platform (CSIP)
+# Customer Support Intelligence Platform
 
-A full-stack customer support platform that combines ticket management, AI-powered ticket analysis, retrieval-augmented generation (RAG), and event-driven processing to help support teams manage and investigate customer issues.
+Customer Support Intelligence Platform is a full-stack support workflow app with ticket management, agent assignment, asynchronous AI analysis, and a dashboard for tracking support activity.
 
-## Key Features
+The system is split into three services:
 
-- **Ticket Management:** Create, update, search, filter, and paginate support tickets.
-- **AI-Powered Analysis:** Classify tickets by category and priority, detect customer sentiment, and generate suggested responses.
-- **RAG Knowledge Retrieval:** Retrieve relevant troubleshooting guides and policies to ground AI-generated responses in internal documentation.
-- **Event-Driven Processing:** Use Apache Kafka to process ticket events asynchronously.
-- **Resilient AI Processing:** Implement Kafka retries, a dead-letter topic (DLT), and manual AI analysis recovery.
-- **Agent Assignment:** Assign tickets to support agents and maintain assignment history.
-- **Activity Auditing:** Track ticket lifecycle changes and AI-related events.
-- **Interactive Dashboard:** View tickets, AI results, knowledge sources, assignment history, and activity logs.
+- `support`: Spring Boot backend for customers, agents, tickets, Kafka events, and persistence
+- `ai-service`: FastAPI service that analyzes tickets with RAG over a local knowledge base
+- `dashboard`: Next.js frontend for interacting with the platform
 
-## Technology Stack
+## Features
 
-| Component | Technologies |
+- Create and manage customers, agents, and tickets
+- Assign tickets to agents and track assignment history
+- Record ticket activity and AI processing status
+- Publish ticket-created events through Kafka
+- Run AI analysis asynchronously through the AI service
+- Use RAG with Markdown knowledge-base documents
+- Retry failed AI processing
+- Run the full stack with Docker Compose
+
+## Tech Stack
+
+| Part | Stack |
 |---|---|
-| Frontend | Next.js 16, TypeScript, Tailwind CSS |
-| Backend | Java 21, Spring Boot 3.5.6 |
+| Backend | Java 21, Spring Boot 3.5.6, Spring Data JPA, Spring Kafka |
+| Frontend | Next.js 16, React 19, TypeScript |
+| AI Service | Python, FastAPI, OpenAI, ChromaDB |
 | Database | PostgreSQL 16 |
-| Messaging | Apache Kafka |
-| AI Service | Python, FastAPI, OpenAI |
-| Retrieval | ChromaDB, RAG |
-| Infrastructure | Docker, Docker Compose |
-| Testing and CI | JUnit, MockMvc, Pytest, GitHub Actions |
+| Messaging | Apache Kafka 4 |
+| Tooling | Docker, Docker Compose |
+
+## Repository Layout
+
+```text
+customer-support-intelligence-platform/
+|-- support/
+|-- ai-service/
+|-- dashboard/
+|-- docker-compose.yaml
+`-- README.md
+```
 
 ## Architecture
+```mermaid
+flowchart LR
+    U[Support User] --> D[Dashboard]
+    D --> B[Spring Boot Backend]
+    B --> P[(PostgreSQL)]
+    B --> K[(Kafka)]
+    K --> A[FastAPI AI Service]
+    A --> C[(ChromaDB RAG Store)]
+    A --> O[OpenAI API]
+    A --> B
+```
 
-1. The dashboard sends requests to the Spring Boot backend.
-2. The backend persists customers, tickets, assignments, and activity records in PostgreSQL.
-3. Ticket events are published to Kafka for asynchronous processing.
-4. The Python AI service retrieves relevant knowledge-base content and generates ticket analysis.
-5. Failed event processing can be retried, routed to a dead-letter topic, and recovered through manual AI retry.
-6. The dashboard displays ticket information, AI recommendations, and relevant knowledge sources.
+## Ticket Flow
 
-## Running Locally
+```mermaid
+sequenceDiagram
+    participant User
+    participant Dashboard
+    participant Backend
+    participant Kafka
+    participant AI as AI Service
+    participant DB as PostgreSQL
+
+    User->>Dashboard: Create ticket
+    Dashboard->>Backend: POST /api/tickets
+    Backend->>DB: Persist ticket
+    Backend->>Kafka: Publish TICKET_CREATED
+    Kafka->>AI: Consume event
+    AI->>AI: Load RAG context
+    AI->>Backend: Return analysis
+    Backend->>DB: Save AI results
+    Backend->>Dashboard: Ticket updated
+```
+
+## Services
+
+The root `docker-compose.yaml` starts these containers:
+
+- PostgreSQL on `5432`
+- Kafka on `9092`
+- AI service on `8000`
+- Backend on `8080`
+- Dashboard on `3000`
+
+## Local Setup
 
 ### Prerequisites
 
 - Docker Desktop
 - Git
+- OpenAI API key for the AI service
 
-### Start the application
+### Environment
 
-Clone the repository and navigate to the project directory.
+Set `OPENAI_API_KEY` for the AI service before starting the stack. Do not commit secrets or `.env` files.
 
-Build the Spring Boot backend JAR:
+### Build and Run
 
-```powershell
-cd support
-.\mvnw.cmd clean package -DskipTests
-cd ..
-```
-
-Start the complete application stack:
+From the project root:
 
 ```bash
 docker compose up -d --build
 ```
 
-Configure `OPENAI_API_KEY` in your local environment before starting the AI service. Never commit API keys or secret files.
+To check containers:
 
-### Access the services
+```bash
+docker compose ps
+```
 
-- Dashboard: [http://localhost:3000](http://localhost:3000)
-- Backend health: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-- AI service health: [http://localhost:8000/health](http://localhost:8000/health)
+If you want to build the Spring Boot backend separately:
 
-## API Overview
+```bash
+cd support
+.\mvnw.cmd clean package -DskipTests
+```
 
-### Customers
+## Access
 
-- `POST /api/customers` - Create a customer
-- `GET /api/customers` - List customers
-- `GET /api/customers/{id}` - Get a customer
+- Dashboard: `http://localhost:3000`
+- Backend: `http://localhost:8080`
+- Backend health: `http://localhost:8080/actuator/health`
+- AI service: `http://localhost:8000`
+- AI service health: `http://localhost:8000/health`
 
-### Agents
+## API Summary
 
-- `POST /api/agents` - Create an agent
-- `GET /api/agents` - List agents
+Customers
 
-### Tickets
+- `POST /api/customers`
+- `GET /api/customers`
+- `GET /api/customers/{id}`
 
-- `POST /api/tickets` - Create a ticket
-- `GET /api/tickets` - List and filter tickets
-- `GET /api/tickets/{id}` - Get ticket details
-- `POST /api/tickets/{id}/retry-ai` - Retry AI analysis
+Agents
 
-## Automated Tests
+- `POST /api/agents`
+- `GET /api/agents`
 
-The project currently has **40 automated tests across the backend and AI service**:
+Tickets
 
-- Backend: 28 tests
-- AI service: 12 tests
+- `POST /api/tickets`
+- `GET /api/tickets`
+- `GET /api/tickets/{id}`
+- `PATCH /api/tickets/{id}`
+- `PATCH /api/tickets/{id}/agent/{agentId}`
+- `GET /api/tickets/{id}/assignment-history`
+- `GET /api/tickets/{id}/activity`
+- `POST /api/tickets/{id}/retry-ai`
 
-Both backend and AI service test jobs pass in GitHub Actions.
+## AI Service
 
-## Engineering Highlights
+The AI service loads knowledge documents from `ai-service/knowledge_base/` and uses them to build RAG context for ticket analysis. The current knowledge base includes:
 
-- Asynchronous event-driven processing with Kafka.
-- Retry and dead-letter handling for failed ticket events.
-- RAG-based knowledge retrieval for AI-assisted support.
-- Persistent audit history for ticket activities and agent assignments.
-- Containerized services and automated CI checks.
+- `account-access.md`
+- `payment-troubleshooting.md`
+- `refund-policy.md`
 
-## Project Status
+## Notes
 
-Core ticket management, AI analysis, RAG-based knowledge retrieval, Kafka event processing with retry/DLT handling, agent assignment, activity auditing, and the interactive dashboard are implemented and tested. The application runs locally as a Docker Compose stack.
-
-## License
-
-No license has been specified yet.
+- The backend uses PostgreSQL and Kafka through environment-based configuration.
+- The AI service exposes a health endpoint and a ticket analysis endpoint.
+- The project includes automated tests in the backend and AI service directories.
