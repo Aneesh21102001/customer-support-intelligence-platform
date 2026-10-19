@@ -43,7 +43,7 @@ def test_load_documents_reads_markdown_files():
 
 
 
-def test_search_knowledge_filters_distances_over_one():
+def test_search_knowledge_includes_results_within_threshold():
     fake_results = {
         "documents": [["relevant answer", "weak answer"]],
         "metadatas": [[
@@ -56,12 +56,34 @@ def test_search_knowledge_filters_distances_over_one():
     with patch.object(rag.collection, "query", return_value=fake_results):
         results = rag.search_knowledge("reset password")
 
+    assert results["documents"][0] == [
+        "relevant answer",
+        "weak answer",
+    ]
+    assert results["metadatas"][0] == [
+        {"source": "account-access.md"},
+        {"source": "refund-policy.md"},
+    ]
+    assert results["distances"][0] == [0.4, 1.2]
+
+def test_search_knowledge_excludes_results_above_threshold():
+    fake_results = {
+        "documents": [["relevant answer", "irrelevant answer"]],
+        "metadatas": [[
+            {"source": "account-access.md"},
+            {"source": "refund-policy.md"},
+        ]],
+        "distances": [[0.4, 1.21]],
+    }
+
+    with patch.object(rag.collection, "query", return_value=fake_results):
+        results = rag.search_knowledge("reset password")
+
     assert results["documents"][0] == ["relevant answer"]
     assert results["metadatas"][0] == [
         {"source": "account-access.md"}
     ]
     assert results["distances"][0] == [0.4]
-
 
 def test_build_rag_context_includes_source_and_document():
     results = {
