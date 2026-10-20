@@ -19,6 +19,28 @@ The system is split into three services:
 - Retry failed AI processing
 - Run the full stack with Docker Compose
 
+## Screenshots
+
+### Dashboard Overview
+
+![Dashboard Overview](screenshots/01-dashboard-overview.png)
+
+### Support Overview
+
+![Support Overview](screenshots/02-support-overview.png)
+
+### Ticket Details
+
+![Ticket Details](screenshots/03-ticket-details.png)
+
+### AI Analysis
+
+![AI Analysis](screenshots/04-ai-analysis.png)
+
+### Ticket Activity
+
+![Ticket Activity](screenshots/05-ticket-activity.png)
+
 ## Tech Stack
 
 | Part | Stack |
